@@ -1,0 +1,6 @@
+.netrc
+_netrc
+.venv/
+__pycache__/
+data/raw/
+data/work/

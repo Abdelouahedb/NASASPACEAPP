@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NABD — le pouls de l'eau</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Reem+Kufi:wght@600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="vendor/leaflet.css">
+<style>
+:root {
+  /* Layout: one radar "night" world. Map + control rail on top, evidence (charts, budget, method) below. */
+  --ink: #0a1120;
+  --panel: #111a2c;
+  --panel-2: #16223a;
+  --line: #24314d;
+  --text: #e8edf6;
+  --muted: #93a1ba;
+  --saffron: #f2a541;      /* accent: L-band / Moroccan saffron */
+  --water: #38bdf8;        /* data: water */
+  --crop: #a3e635;         /* data: growing crops */
+  --warn: #fb923c;
+  --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  --arabic: "Reem Kufi", "Noto Kufi Arabic", "Segoe UI", sans-serif;
+  --r: 10px;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--ink); color: var(--text); font: 15px/1.55 var(--body); }
+a { color: var(--saffron); }
+:focus-visible { outline: 2px solid var(--saffron); outline-offset: 2px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; letter-spacing: -0.01em; }
+.wrap { max-width: 1320px; margin: 0 auto; padding: 0 20px; }
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.muted { color: var(--muted); }
+
+/* header */
+header { border-bottom: 1px solid var(--line); }
+.top { display: flex; align-items: center; gap: 16px; padding: 14px 0; flex-wrap: wrap; }
+.brand { display: flex; align-items: baseline; gap: 12px; }
+.brand h1 { font-size: 28px; font-weight: 800; }
+.brand .ar { font-family: var(--arabic); font-size: 26px; color: var(--saffron); }
+.brand .tag { color: var(--muted); font-size: 14px; }
+.top .spacer { flex: 1; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+.seg button { background: none; border: 0; color: var(--muted); padding: 6px 12px; font: 600 13px var(--body); cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--panel-2); color: var(--text); }
+.demo { background: #3a2a0d; border: 1px solid #7a5518; color: #fcd9a0; padding: 8px 14px; border-radius: var(--r); font-size: 13.5px; margin: 12px 0 0; }
+
+/* intro + key numbers */
+.intro { display: grid; grid-template-columns: 1.1fr 1.9fr; gap: 28px; padding: 22px 0 18px; align-items: end; }
+.intro p { margin: 0; max-width: 62ch; color: #cdd6e6; }
+.intro h2 { font-size: 30px; line-height: 1.15; margin-bottom: 10px; }
+.kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.kpi { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px; }
+.kpi .lbl { font-size: 12.5px; color: var(--muted); }
+.kpi .val { font: 600 26px var(--mono); margin-top: 2px; }
+.kpi .val small { font-size: 14px; color: var(--muted); font-weight: 400; }
+.kpi .sub { font-size: 12.5px; color: var(--muted); }
+.kpi.water { border-top: 3px solid var(--water); }
+.kpi.fill { border-top: 3px solid var(--saffron); }
+.kpi.crop { border-top: 3px solid var(--crop); }
+
+/* map + rail */
+.stage { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 14px; }
+#map { height: 600px; border-radius: var(--r); border: 1px solid var(--line); background: #0d1626; }
+.leaflet-container { font: 13px var(--body); }
+.leaflet-control-attribution { background: rgba(10,17,32,.75) !important; color: var(--muted) !important; }
+.leaflet-control-attribution a { color: var(--muted) !important; }
+.leaflet-bar a { background: var(--panel-2); color: var(--text); border-color: var(--line); }
+.leaflet-tooltip.dam { background: var(--panel); color: var(--text); border: 1px solid var(--line); box-shadow: none; }
+.rail { display: flex; flex-direction: column; gap: 12px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 14px; }
+.card h3 { font-size: 15px; margin-bottom: 8px; }
+.tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.tabs button { background: var(--panel-2); border: 1px solid var(--line); color: var(--muted); border-radius: 8px; padding: 9px 8px; font: 600 13.5px var(--body); cursor: pointer; text-align: left; }
+.tabs button span { display: block; font-weight: 400; font-size: 12px; }
+.tabs button[aria-pressed="true"] { border-color: var(--saffron); color: var(--text); }
+.time { display: flex; align-items: center; gap: 10px; }
+.play { width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--saffron); background: none; color: var(--saffron); cursor: pointer; font-size: 15px; flex: none; }
+.play:hover { background: rgba(242,165,65,.12); }
+input[type=range] { width: 100%; accent-color: var(--saffron); }
+.date-line { display: flex; justify-content: space-between; align-items: baseline; margin-top: 6px; gap: 8px; flex-wrap: wrap; }
+.date-line .d { font: 600 18px var(--mono); }
+.chip { display: inline-block; font-size: 11.5px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+.chip.warn { border-color: var(--warn); color: var(--warn); }
+.stat { display: flex; justify-content: space-between; padding: 6px 0; border-top: 1px dashed var(--line); font-size: 14px; }
+.stat:first-of-type { border-top: 0; }
+.stat b { font: 600 15px var(--mono); }
+.toggles { display: flex; flex-wrap: wrap; gap: 6px; }
+.toggles label { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; padding: 5px 10px; border: 1px solid var(--line); border-radius: 999px; cursor: pointer; background: var(--panel-2); }
+.toggles input { accent-color: var(--saffron); margin: 0; }
+.legend { display: grid; gap: 4px; margin-top: 10px; font-size: 12.5px; }
+.legend div { display: flex; align-items: center; gap: 8px; }
+.sw { width: 14px; height: 14px; border-radius: 3px; flex: none; border: 1px solid rgba(255,255,255,.15); }
+.ramp { height: 10px; border-radius: 3px; flex: 1; }
+.listen canvas { width: 100%; height: 70px; display: block; background: var(--panel-2); border-radius: 6px; margin: 8px 0; }
+.btn { background: var(--saffron); color: #1b1203; border: 0; border-radius: 8px; padding: 8px 12px; font: 600 13.5px var(--body); cursor: pointer; }
+.btn.ghost { background: none; color: var(--saffron); border: 1px solid var(--saffron); }
+.btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* evidence sections */
+section.block { padding: 34px 0 6px; }
+section.block > h2 { font-size: 24px; margin-bottom: 6px; }
+section.block > p.lead { color: #cdd6e6; max-width: 70ch; margin: 0 0 16px; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.chart-box { position: relative; height: 300px; }
+.bars { display: grid; gap: 8px; }
+.bar { display: grid; grid-template-columns: 170px 1fr 84px; gap: 10px; align-items: center; font-size: 13.5px; }
+.bar .track { background: var(--panel-2); border-radius: 4px; height: 12px; overflow: hidden; }
+.bar .fillb { height: 100%; border-radius: 4px; }
+.bar .v { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.budget { display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; gap: 12px; align-items: stretch; }
+.budget .arrow { align-self: center; color: var(--muted); font-size: 22px; }
+.budget .card .big { font: 600 30px var(--mono); }
+.budget .card .big small { font-size: 15px; color: var(--muted); }
+.note { font-size: 13.5px; color: var(--muted); max-width: 80ch; margin-top: 12px; }
+.steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; counter-reset: s; }
+.steps .card h3::before { counter-increment: s; content: counter(s) "  "; color: var(--saffron); font-family: var(--mono); }
+.steps p { margin: 0; font-size: 13.5px; color: #cdd6e6; }
+footer { border-top: 1px solid var(--line); margin-top: 40px; padding: 20px 0 40px; font-size: 13px; color: var(--muted); }
+footer ul { margin: 6px 0 0; padding-left: 18px; columns: 2; column-gap: 32px; }
+footer li { margin-bottom: 4px; break-inside: avoid; }
+
+@media (max-width: 1000px) {
+  .intro, .stage, .two { grid-template-columns: 1fr; }
+  .steps { grid-template-columns: 1fr 1fr; }
+  .budget { grid-template-columns: 1fr; }
+  .budget .arrow { transform: rotate(90deg); justify-self: center; }
+  #map { height: 460px; }
+  footer ul { columns: 1; }
+}
+@media (max-width: 520px) {
+  .kpis { grid-template-columns: 1fr; }
+  .steps { grid-template-columns: 1fr; }
+  .bar { grid-template-columns: 110px 1fr 70px; }
+  .brand h1 { font-size: 24px; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap top">
+    <div class="brand">
+      <h1>NABD</h1><span class="ar" lang="ar">نبض</span>
+      <span class="tag" data-i18n="tagline">le pouls de l'eau du Maroc, vu par le radar NISAR</span>
+    </div>
+    <div class="spacer"></div>
+    <div class="seg" role="group" aria-label="Langue / Language">
+      <button id="lang-fr" aria-pressed="true">FR</button>
+      <button id="lang-en" aria-pressed="false">EN</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div id="demo-banner" class="demo" hidden data-i18n="demo">Données de démonstration (synthétiques) : le pipeline et l'interface sont réels, les images NISAR seront chargées dès leur téléchargement. Les chiffres officiels du barrage, eux, sont réels.</div>
+
+  <div class="intro">
+    <div>
+      <h2 data-i18n="h_intro">D'où vient l'eau, où va-t-elle ?</h2>
+      <p data-i18n="p_intro">Le barrage Al Massira, deuxième réservoir du Maroc, remonte après sept ans de sécheresse. Ses lâchers irriguent la plaine des Doukkala. Le radar NISAR (NASA–ISRO, bande L) voit les deux à travers les nuages, de jour comme de nuit, tous les 12 jours : le lac qui respire, et les champs qui poussent en plein été sec.</p>
+    </div>
+    <div class="kpis">
+      <div class="kpi water"><div class="lbl" data-i18n="k_lake">Surface du lac (radar)</div><div class="val num" id="k-lake">–</div><div class="sub" id="k-lake-sub"></div></div>
+      <div class="kpi fill"><div class="lbl" data-i18n="k_fill">Remplissage officiel</div><div class="val num" id="k-fill">–</div><div class="sub" id="k-fill-sub"></div></div>
+      <div class="kpi crop"><div class="lbl" data-i18n="k_crop">Cultures actives en été (radar)</div><div class="val num" id="k-crop">–</div><div class="sub" data-i18n="k_crop_sub">périmètre des Doukkala</div></div>
+    </div>
+  </div>
+
+  <div class="stage">
+    <div id="map" role="region" aria-label="Carte radar"></div>
+    <aside class="rail">
+      <div class="card">
+        <div class="tabs" role="group" aria-label="Zone">
+          <button id="tab-massira" aria-pressed="true"><span data-i18n="t_supply">L'offre</span>Al Massira</button>
+          <button id="tab-doukkala" aria-pressed="false"><span data-i18n="t_demand">La demande</span>Doukkala</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="time">
+          <button class="play" id="play" aria-label="Lecture">▶</button>
+          <input type="range" id="slider" min="0" max="0" value="0" aria-label="Date">
+        </div>
+        <div class="date-line"><span class="d" id="date">–</span><span id="pass" class="chip"></span></div>
+        <div id="stats" style="margin-top:8px"></div>
+      </div>
+      <div class="card">
+        <h3 data-i18n="layers">Couches</h3>
+        <div class="toggles" id="toggles"></div>
+        <div class="legend" id="legend"></div>
+      </div>
+      <div class="card listen">
+        <h3 data-i18n="listen_h">Écouter la Terre</h3>
+        <div class="muted" style="font-size:13px" id="listen-hint" data-i18n="listen_hint">Cliquez n'importe où sur la carte : la série radar de ce point devient une mélodie. L'eau sonne grave, une culture qui pousse monte.</div>
+        <canvas id="spark" width="600" height="140" aria-label="Série temporelle du point choisi"></canvas>
+        <div class="btn-row">
+          <button class="btn" id="listen-season" data-i18n="listen_season">Écouter la saison</button>
+          <button class="btn ghost" id="listen-stop" data-i18n="stop">Stop</button>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <section class="block">
+    <h2 data-i18n="h_lake">Le lac : radar contre chiffres officiels</h2>
+    <p class="lead" data-i18n="p_lake">Chaque point bleu est une image NISAR : la surface d'eau détectée automatiquement. La courbe orange est le taux de remplissage publié par le ministère de l'Équipement et de l'Eau. Si les deux évoluent ensemble, le radar mesure juste.</p>
+    <div class="card">
+      <div class="seg" role="group" aria-label="Période" style="margin-bottom:10px">
+        <button id="r-radar" aria-pressed="true" data-i18n="r_radar">Période radar (juin–oct. 2026)</button>
+        <button id="r-all" aria-pressed="false" data-i18n="r_all">Depuis 2025 : la remontée</button>
+      </div>
+      <div class="chart-box"><canvas id="chart-lake" aria-label="Graphique surface du lac et remplissage"></canvas></div></div>
+  </section>
+
+  <section class="block">
+    <h2 data-i18n="h_fields">Les champs : qui pousse en plein été ?</h2>
+    <p class="lead" data-i18n="p_fields">De juin à octobre il ne pleut presque pas dans les Doukkala. Un champ dont le signal radar HV monte est en train de faire des feuilles : il est irrigué. Le radar suit chaque parcelle de 40 m, tous les 12 jours.</p>
+    <div class="two">
+      <div class="card"><h3 data-i18n="green_h">Surface de végétation active, par passage</h3><div class="chart-box"><canvas id="chart-green" aria-label="Surface verte par date"></canvas></div></div>
+      <div class="card">
+        <h3 data-i18n="classes_h">Occupation du sol sur l'été (radar)</h3>
+        <div class="bars" id="class-bars"></div>
+        <h3 style="margin-top:18px" data-i18n="peak_h">Calendrier : mois du pic de croissance</h3>
+        <div class="bars" id="peak-bars"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="block">
+    <h2 data-i18n="h_budget">Le bilan de l'été</h2>
+    <p class="lead" id="budget-lead"></p>
+    <div class="budget" id="budget"></div>
+    <p class="note" data-i18n="budget_note">Ordre de grandeur, pas une comptabilité exacte : Al Massira fournit aussi l'eau potable (El Jadida, Safi, Settat, sud de Casablanca…), perd de l'eau par évaporation et reçoit des transferts d'autres barrages. NABD montre où regarder ; les gestionnaires de l'eau peuvent croiser ces cartes avec leurs registres de lâchers.</p>
+  </section>
+
+  <section class="block">
+    <h2 data-i18n="h_method">Comment ça marche</h2>
+    <div class="steps">
+      <div class="card"><h3 data-i18n="s1_h">Données NISAR</h3><p data-i18n="s1">Produit GCOV bande L (24 cm), polarisations HH et HV, pixels de 20 m, corrigé du relief. Seule la fenêtre utile est découpée chez la NASA (Harmony) : quelques Mo au lieu de 6 Go par image.</p></div>
+      <div class="card"><h3 data-i18n="s2_h">Eau</h3><p data-i18n="s2">Une eau calme renvoie le signal ailleurs, comme un miroir : elle est très sombre. Seuil automatique (Otsu) sur HV et HH, filtre du chatoiement (Lee), nettoyage des petites taches.</p></div>
+      <div class="card"><h3 data-i18n="s3_h">Champs</h3><p data-i18n="s3">Pour chaque pixel, on lit sa série dans le temps sur une même orbite. HV qui monte puis redescend : une culture pousse puis est récoltée. HV fort et stable : arbres. HH très fort : bâti.</p></div>
+      <div class="card"><h3 data-i18n="s4_h">Vérification</h3><p data-i18n="s4">La surface du lac est comparée aux taux de remplissage officiels. Les passages qui couvrent mal la zone sont signalés et exclus des tendances.</p></div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div data-i18n="credits">Projet NASA Space Apps Challenge 2026, défi « Dancing with the SARs ». Code ouvert. Données radar : NASA/JPL–ISRO NISAR via ASF DAAC. Fonds de carte : Esri.</div>
+    <div style="margin-top:10px" data-i18n="sources_h">Sources des chiffres officiels :</div>
+    <ul id="sources"></ul>
+  </div>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="data/data.js"></script>
+<script>
+(function () {
+"use strict";
+const D = window.NABD;
+const ZM = D.zones.massira, ZD = D.zones.doukkala;
+
+// ---------------------------------------------------------------- i18n
+const EN = {
+  tagline: "the pulse of Morocco's water, seen by the NISAR radar",
+  demo: "Demo data (synthetic): the pipeline and the interface are real; NISAR images load as soon as they are downloaded. The dam's official figures are real.",
+  h_intro: "Where does the water come from, and where does it go?",
+  p_intro: "Al Massira, Morocco's second-largest reservoir, is recovering after seven years of drought. Its releases irrigate the Doukkala plain. The NISAR radar (NASA–ISRO, L-band) sees both through clouds, day and night, every 12 days: the lake breathing, and fields growing in the middle of the dry summer.",
+  k_lake: "Lake area (radar)", k_fill: "Official fill rate", k_crop: "Active summer crops (radar)", k_crop_sub: "Doukkala irrigated plain",
+  t_supply: "Supply", t_demand: "Demand", layers: "Layers",
+  listen_h: "Listen to the Earth",
+  listen_hint: "Click anywhere on the map: the radar time series of that spot becomes a melody. Water sounds low, a growing crop rises.",
+  listen_season: "Play the season", stop: "Stop",
+  h_lake: "The lake: radar versus official figures",
+  p_lake: "Each blue dot is one NISAR image: the water area detected automatically. The orange line is the fill rate published by Morocco's Ministry of Equipment and Water. When both move together, the radar is measuring right.",
+  r_radar: "Radar period (Jun–Oct 2026)", r_all: "Since 2025: the recovery",
+  h_fields: "The fields: what grows in mid-summer?",
+  p_fields: "From June to October it hardly rains in the Doukkala. A field whose HV radar signal rises is growing leaves: it is irrigated. The radar follows every 40 m parcel, every 12 days.",
+  green_h: "Area of active vegetation, per pass", classes_h: "Summer land cover (radar)", peak_h: "Calendar: month of peak growth",
+  h_budget: "The summer's balance",
+  budget_note: "An order of magnitude, not exact accounting: Al Massira also supplies drinking water (El Jadida, Safi, Settat, south Casablanca…), loses water to evaporation and receives transfers from other dams. NABD shows where to look; water managers can cross these maps with their release records.",
+  h_method: "How it works",
+  s1_h: "NISAR data", s1: "GCOV product, L-band (24 cm), HH and HV polarizations, 20 m pixels, terrain-corrected. Only the useful window is cut at NASA (Harmony): a few MB instead of 6 GB per image.",
+  s2_h: "Water", s2: "Calm water reflects the signal away like a mirror, so it is very dark. Automatic (Otsu) threshold on HV and HH, speckle filter (Lee), small specks removed.",
+  s3_h: "Fields", s3: "For every pixel we read its time series on one orbit. HV rising then falling: a crop grows then is harvested. Strong, steady HV: trees. Very strong HH: buildings.",
+  s4_h: "Checking", s4: "Lake area is compared with official fill rates. Passes that cover the zone poorly are flagged and left out of trends.",
+  credits: "NASA Space Apps Challenge 2026 project, “Dancing with the SARs” challenge. Open source. Radar data: NASA/JPL–ISRO NISAR via ASF DAAC. Basemap: Esri.",
+  sources_h: "Sources for official figures:"
+};
+const FR = {};
+document.querySelectorAll("[data-i18n]").forEach(el => { FR[el.dataset.i18n] = el.textContent; });
+let lang = "fr";
+try { lang = localStorage.getItem("nabd-lang") || "fr"; } catch (e) {}
+const T = {
+  fr: { radar: "Radar (HH/HV)", water: "Eau détectée", change: "Changement", occurrence: "Fréquence de l'eau",
+        classes: "Occupation du sol", peak: "Mois du pic", lake: "Lac", km2: "km²", ha: "ha",
+        delta_first: "depuis le", fill_on: "le", green: "Végétation active", coverage: "Couverture",
+        partial: "passage partiel", asc: "montant", desc: "descendant", track: "orbite",
+        lost: "Rivage perdu", gained: "Eau gagnée", stayed: "Eau stable", occ_lo: "rarement", occ_hi: "toujours",
+        official: "Remplissage officiel (%)", radar_area: "Surface d'eau radar (km²)",
+        months: { 6: "Juin", 7: "Juillet", 8: "Août", 9: "Septembre", 10: "Octobre" },
+        cls: { water: "Eau", urban: "Bâti / villages", trees: "Arbres / vergers", crop: "Culture active (irriguée)", bare: "Sol nu / jachère" },
+        pix_title: "Point", pix_water: "probablement de l'eau", pix_crop: "culture qui pousse", pix_flat: "signal stable",
+        no_data: "Pas de donnée ici.", outside: "Ce point est hors des deux zones étudiées.",
+        b_vol: "Volume du barrage (officiel)", b_lake: "Surface du lac (radar)", b_crop: "Cultures actives (radar)",
+        b_lead: (b) => `Du ${fmtDate(b.from)} au ${fmtDate(b.to)}, les deux bouts du système :` },
+  en: { radar: "Radar (HH/HV)", water: "Detected water", change: "Change", occurrence: "Water frequency",
+        classes: "Land cover", peak: "Peak month", lake: "Lake", km2: "km²", ha: "ha",
+        delta_first: "since", fill_on: "on", green: "Active vegetation", coverage: "Coverage",
+        partial: "partial pass", asc: "ascending", desc: "descending", track: "track",
+        lost: "Shore lost", gained: "Water gained", stayed: "Stable water", occ_lo: "rarely", occ_hi: "always",
+        official: "Official fill rate (%)", radar_area: "Radar water area (km²)",
+        months: { 6: "June", 7: "July", 8: "August", 9: "September", 10: "October" },
+        cls: { water: "Water", urban: "Built-up / villages", trees: "Trees / orchards", crop: "Active crop (irrigated)", bare: "Bare soil / fallow" },
+        pix_title: "Point", pix_water: "probably water", pix_crop: "crop growing", pix_flat: "steady signal",
+        no_data: "No data here.", outside: "This point is outside the two study zones.",
+        b_vol: "Dam volume (official)", b_lake: "Lake area (radar)", b_crop: "Active crops (radar)",
+        b_lead: (b) => `From ${fmtDate(b.from)} to ${fmtDate(b.to)}, both ends of the system:` }
+};
+const t = () => T[lang];
+function fmtDate(iso) {
+  return new Date(iso + "T12:00:00Z").toLocaleDateString(lang === "fr" ? "fr-FR" : "en-GB",
+    { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+}
+const nf = (v, d = 1) => v == null ? "–" : v.toLocaleString(lang === "fr" ? "fr-FR" : "en-GB", { minimumFractionDigits: d, maximumFractionDigits: d });
+
+// ---------------------------------------------------------------- helpers
+const official = D.official || [];
+function interpFill(iso, field) {
+  const pts = official.filter(o => o[field] != null).map(o => [Date.parse(o.date), o[field]]);
+  if (!pts.length) return null;
+  const x = Date.parse(iso);
+  if (x <= pts[0][0]) return pts[0][1];
+  for (let i = 1; i < pts.length; i++) if (x <= pts[i][0]) {
+    const [x0, y0] = pts[i - 1], [x1, y1] = pts[i];
+    return y0 + (y1 - y0) * (x - x0) / (x1 - x0);
+  }
+  return pts[pts.length - 1][1];
+}
+const fullLake = ZM ? ZM.dates.filter(d => !d.partial) : [];
+
+// ---------------------------------------------------------------- map
+const map = L.map("map", { zoomSnap: 0.25, preferCanvas: true });
+const base = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+  { maxZoom: 17, attribution: "Imagery © Esri" }).addTo(map);
+let tileOk = 0, tileErr = 0;
+base.on("tileload", () => tileOk++);
+base.on("tileerror", () => { if (++tileErr > 6 && tileOk === 0) map.removeLayer(base); });
+
+const L_ = {};
+function overlay(url, bounds, opacity = 1) { return L.imageOverlay(url, bounds, { opacity, interactive: false }); }
+if (ZM) {
+  const last = ZM.dates.length - 1;
+  L_.m_radar = overlay(ZM.dates[last].radar, ZM.bounds, 0.95);
+  L_.m_water = overlay(ZM.dates[last].water, ZM.bounds);
+  L_.m_change = overlay(ZM.change.image, ZM.bounds);
+  L_.m_occ = overlay(ZM.occurrence, ZM.bounds, 0.95);
+  L.rectangle(ZM.bounds, { color: "#38bdf8", weight: 1, dashArray: "4 4", fill: false, interactive: false }).addTo(map);
+}
+if (ZD) {
+  const last = ZD.dates.length - 1;
+  L_.d_radar = overlay(ZD.dates[last].radar, ZD.bounds, 0.95);
+  L_.d_classes = overlay(ZD.classes_image, ZD.bounds, 0.9);
+  L_.d_peak = overlay(ZD.peak_image, ZD.bounds, 0.95);
+  L.rectangle(ZD.bounds, { color: "#a3e635", weight: 1, dashArray: "4 4", fill: false, interactive: false }).addTo(map);
+}
+// schematic path of the released water (dam -> Oum Er-Rbia -> Doukkala), not the real river course
+if (ZM && ZD) {
+  const dc = [(ZD.bounds[0][0] + ZD.bounds[1][0]) / 2, (ZD.bounds[0][1] + ZD.bounds[1][1]) / 2];
+  L.polyline([D.dam, [32.55, -7.95], [32.68, -8.2], dc], { color: "#f2a541", weight: 2, dashArray: "2 8", opacity: 0.9, interactive: false }).addTo(map);
+}
+L.circleMarker(D.dam, { radius: 6, color: "#f2a541", weight: 2, fillColor: "#0a1120", fillOpacity: 1 })
+  .bindTooltip("Barrage Al Massira · سد المسيرة", { className: "dam", direction: "top" }).addTo(map);
+
+// preload every frame so the animation is smooth
+[...(ZM ? ZM.dates : []), ...(ZD ? ZD.dates : [])].forEach(d => { [d.radar, d.water].forEach(u => { if (u) { const i = new Image(); i.src = u; } }); });
+
+// ---------------------------------------------------------------- state
+const state = { zone: ZM ? "massira" : "doukkala", idx: {}, on: { radar: true, water: true, change: false, occurrence: false, classes: true, peak: false } };
+if (ZM) state.idx.massira = ZM.dates.length - 1;
+if (ZD) state.idx.doukkala = ZD.dates.length - 1;
+const Z = () => D.zones[state.zone];
+
+const LAYER_DEFS = {
+  massira: [["radar", "m_radar"], ["water", "m_water"], ["change", "m_change"], ["occurrence", "m_occ"]],
+  doukkala: [["radar", "d_radar"], ["classes", "d_classes"], ["peak", "d_peak"]]
+};
+function syncLayers() {
+  for (const z of Object.keys(LAYER_DEFS)) for (const [name, id] of LAYER_DEFS[z]) {
+    const lyr = L_[id]; if (!lyr) continue;
+    // both zones stay visible; toggles apply to each zone's own layers
+    const want = state.on[name];
+    if (want && !map.hasLayer(lyr)) lyr.addTo(map);
+    if (!want && map.hasLayer(lyr)) map.removeLayer(lyr);
+  }
+  // keep a sensible stacking order
+  ["m_radar", "d_radar", "m_occ", "m_water", "m_change", "d_classes", "d_peak"].forEach(id => { if (L_[id] && map.hasLayer(L_[id])) L_[id].bringToFront(); });
+}
+
+function renderToggles() {
+  const box = document.getElementById("toggles");
+  box.innerHTML = "";
+  for (const [name] of LAYER_DEFS[state.zone]) {
+    const id = "tg-" + name;
+    const lab = document.createElement("label");
+    lab.innerHTML = `<input type="checkbox" id="${id}" ${state.on[name] ? "checked" : ""}> ${t()[name]}`;
+    lab.querySelector("input").addEventListener("change", e => { state.on[name] = e.target.checked; syncLayers(); renderLegend(); });
+    box.appendChild(lab);
+  }
+}
+function renderLegend() {
+  const el = document.getElementById("legend"), L = t();
+  let h = "";
+  if (state.zone === "massira") {
+    if (state.on.water) h += `<div><span class="sw" style="background:rgba(56,189,248,.8)"></span>${L.water}</div>`;
+    if (state.on.change) h += `<div><span class="sw" style="background:#f97316"></span>${L.lost}</div><div><span class="sw" style="background:#22d3ee"></span>${L.gained}</div><div><span class="sw" style="background:rgba(37,99,235,.6)"></span>${L.stayed}</div>`;
+    if (state.on.occurrence) h += `<div>${L.occ_lo}<span class="ramp" style="background:linear-gradient(90deg,#fef08a,#4ade80,#22d3ee,#2563eb,#1e1b78)"></span>${L.occ_hi}</div>`;
+  } else if (ZD) {
+    if (state.on.classes) for (const [k, c] of Object.entries(ZD.classes)) h += `<div><span class="sw" style="background:${c.color}"></span>${L.cls[k]}</div>`;
+    if (state.on.peak) for (const [m, col] of Object.entries(ZD.month_colors)) h += `<div><span class="sw" style="background:${col}"></span>${L.months[m]}</div>`;
+  }
+  if (state.on.radar) h += `<div class="muted">${lang === "fr" ? "Radar : rouge = HH, vert = HV (végétation), bleu = rapport HH/HV ; l'eau est presque noire." : "Radar: red = HH, green = HV (vegetation), blue = HH/HV ratio; water is near black."}</div>`;
+  el.innerHTML = h;
+}
+
+// ---------------------------------------------------------------- time
+const slider = document.getElementById("slider");
+function setIndex(i) {
+  const z = Z(); if (!z) return;
+  i = Math.max(0, Math.min(z.dates.length - 1, i));
+  state.idx[state.zone] = i;
+  slider.max = z.dates.length - 1; slider.value = i;
+  const d = z.dates[i], L = t();
+  if (state.zone === "massira") { L_.m_radar.setUrl(d.radar); L_.m_water.setUrl(d.water); }
+  else { L_.d_radar.setUrl(d.radar); }
+  document.getElementById("date").textContent = fmtDate(d.date);
+  const pass = document.getElementById("pass");
+  pass.textContent = d.partial ? `${L.partial} · ${Math.round(d.coverage * 100)} %` : `${L.track} ${d.track} · ${d.direction === "ascending" ? L.asc : L.desc}`;
+  pass.className = "chip" + (d.partial ? " warn" : "");
+  let s = "";
+  if (state.zone === "massira") {
+    const f0 = fullLake[0];
+    const dl = d.lake_km2 - f0.lake_km2;
+    s += `<div class="stat"><span>${L.lake}</span><b>${nf(d.lake_km2)} ${L.km2}</b></div>`;
+    s += `<div class="stat"><span>Δ ${L.delta_first} ${fmtDate(f0.date)}</span><b>${dl >= 0 ? "+" : ""}${nf(dl, 2)} ${L.km2}</b></div>`;
+    const fill = interpFill(d.date, "fill_pct");
+    if (fill != null) s += `<div class="stat"><span>${L.official.replace(" (%)", "")}</span><b>${nf(fill)} %</b></div>`;
+  } else {
+    s += `<div class="stat"><span>${L.green}</span><b>${nf(d.green_km2, 0)} ${L.km2}</b></div>`;
+    s += `<div class="stat"><span>${L.coverage}</span><b>${Math.round(d.coverage * 100)} %</b></div>`;
+  }
+  document.getElementById("stats").innerHTML = s;
+  highlightCharts();
+}
+slider.addEventListener("input", e => setIndex(+e.target.value));
+let timer = null;
+const playBtn = document.getElementById("play");
+function stopPlay() { clearInterval(timer); timer = null; playBtn.textContent = "▶"; }
+playBtn.addEventListener("click", () => {
+  if (timer) return stopPlay();
+  playBtn.textContent = "❚❚";
+  if (+slider.value >= +slider.max) setIndex(0);
+  timer = setInterval(() => { const i = +slider.value + 1; if (i > +slider.max) return stopPlay(); setIndex(i); }, 700);
+});
+document.addEventListener("keydown", e => {
+  if (e.target.tagName === "INPUT" && e.target.type !== "range") return;
+  if (e.key === "ArrowRight" && e.target !== slider) setIndex(+slider.value + 1);
+  if (e.key === "ArrowLeft" && e.target !== slider) setIndex(+slider.value - 1);
+});
+
+function setZone(z, fit = true) {
+  if (!D.zones[z]) return;
+  stopPlay();
+  state.zone = z;
+  document.getElementById("tab-massira").setAttribute("aria-pressed", z === "massira");
+  document.getElementById("tab-doukkala").setAttribute("aria-pressed", z === "doukkala");
+  if (fit) map.fitBounds(D.zones[z].bounds, { padding: [10, 10] });
+  renderToggles(); renderLegend(); setIndex(state.idx[z]);
+}
+document.getElementById("tab-massira").addEventListener("click", () => setZone("massira"));
+document.getElementById("tab-doukkala").addEventListener("click", () => setZone("doukkala"));
+
+// ---------------------------------------------------------------- sound
+let ac = null, playing = [];
+const HIJAZ = [0, 1, 4, 5, 7, 8, 10];           // a maqam Hijaz-like scale, familiar in Moroccan music
+function audio() { if (!ac) { const C = window.AudioContext || window.webkitAudioContext; if (C) ac = new C(); } if (ac && ac.state === "suspended") ac.resume(); return ac; }
+function stopSound() { playing.forEach(n => { try { n.stop(); } catch (e) {} }); playing = []; }
+function noteFreq(step) { const oct = Math.floor(step / 7), deg = ((step % 7) + 7) % 7; return 146.83 * Math.pow(2, oct + HIJAZ[deg] / 12); }
+function tone(f, at, dur, type, gain) {
+  const o = ac.createOscillator(), g = ac.createGain();
+  o.type = type; o.frequency.value = f;
+  g.gain.setValueAtTime(0.0001, at); g.gain.exponentialRampToValueAtTime(gain, at + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+  o.connect(g).connect(ac.destination); o.start(at); o.stop(at + dur + 0.05); playing.push(o);
+}
+function drum(at, low) {           // "doum" (low) / "tak" (high), like a darbouka
+  const o = ac.createOscillator(), g = ac.createGain();
+  o.frequency.setValueAtTime(low ? 110 : 420, at); o.frequency.exponentialRampToValueAtTime(low ? 45 : 200, at + 0.15);
+  g.gain.setValueAtTime(low ? 0.5 : 0.18, at); g.gain.exponentialRampToValueAtTime(0.0001, at + (low ? 0.3 : 0.08));
+  o.connect(g).connect(ac.destination); o.start(at); o.stop(at + 0.35); playing.push(o);
+}
+/** play a series of values normalised 0..1 (null = gap) */
+function playSeries(vals, waterMask) {
+  if (!audio()) return;
+  stopSound();
+  const step = 0.28, t0 = ac.currentTime + 0.05;
+  vals.forEach((v, i) => {
+    const at = t0 + i * step;
+    drum(at, i % 2 === 0);
+    if (v == null) return;
+    if (waterMask && waterMask[i]) { tone(73.4, at, 0.4, "sine", 0.35); return; }
+    tone(noteFreq(Math.round(v * 14)), at, 0.32, "triangle", 0.22);
+  });
+}
+const spark = document.getElementById("spark"), sctx = spark.getContext("2d");
+function drawSpark(vals, label, color) {
+  const w = spark.width, h = spark.height; sctx.clearRect(0, 0, w, h);
+  sctx.strokeStyle = "rgba(147,161,186,.18)"; sctx.lineWidth = 1;
+  for (let k = 1; k < 4; k++) { sctx.beginPath(); sctx.moveTo(0, h * k / 4); sctx.lineTo(w, h * k / 4); sctx.stroke(); }
+  const pts = vals.map((v, i) => v == null ? null : [12 + i * (w - 24) / Math.max(1, vals.length - 1), h - 14 - v * (h - 40)]);
+  sctx.beginPath(); let started = false;
+  pts.forEach(p => { if (!p) { started = false; return; } if (!started) { sctx.moveTo(...p); started = true; } else sctx.lineTo(...p); });
+  sctx.strokeStyle = color; sctx.lineWidth = 3; sctx.stroke();
+  pts.forEach((p, i) => { if (!p) return; sctx.beginPath(); sctx.arc(p[0], p[1], i === pts.length - 1 ? 6 : 3.5, 0, 7); sctx.fillStyle = color; sctx.fill(); });
+  sctx.fillStyle = "#e8edf6"; sctx.font = "600 22px IBM Plex Sans, sans-serif"; sctx.fillText(label, 12, 26);
+}
+function decodeCube(c) { if (!c._bytes) { const bin = atob(c.b64); c._bytes = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) c._bytes[i] = bin.charCodeAt(i); } return c._bytes; }
+function seriesAt(z, latlng) {
+  const [[s, w], [n, e]] = z.bounds, c = z.cube;
+  if (latlng.lat < s || latlng.lat > n || latlng.lng < w || latlng.lng > e) return null;
+  const col = Math.min(c.w - 1, Math.floor((latlng.lng - w) / (e - w) * c.w));
+  const row = Math.min(c.h - 1, Math.floor((n - latlng.lat) / (n - s) * c.h));
+  const b = decodeCube(c), out = [];
+  for (let k = 0; k < c.t; k++) { const q = b[k * c.w * c.h + row * c.w + col]; out.push(q === 255 ? null : c.lo + q / 254 * (c.hi - c.lo)); }
+  return out;
+}
+let marker = null;
+map.on("click", ev => {
+  const S = t();
+  const zKey = ["massira", "doukkala"].find(k => D.zones[k] && seriesAt(D.zones[k], ev.latlng));
+  if (!zKey) { drawSpark([], S.outside, "#93a1ba"); return; }
+  if (zKey !== state.zone) setZone(zKey, false);
+  const db = seriesAt(D.zones[zKey], ev.latlng);
+  if (!db.some(v => v != null)) { drawSpark([], S.no_data, "#93a1ba"); return; }
+  const norm = db.map(v => v == null ? null : Math.max(0, Math.min(1, (v + 30) / 20)));
+  const water = db.map(v => v != null && v < -23);
+  const valid = db.filter(v => v != null);
+  const range = Math.max(...valid) - Math.min(...valid);
+  const kind = water.filter(Boolean).length > valid.length / 2 ? S.pix_water : range > 3 ? S.pix_crop : S.pix_flat;
+  const color = kind === S.pix_water ? "#38bdf8" : kind === S.pix_crop ? "#a3e635" : "#f2a541";
+  drawSpark(norm, `HV · ${kind}`, color);
+  if (marker) map.removeLayer(marker);
+  marker = L.circleMarker(ev.latlng, { radius: 7, color, weight: 2, fill: false }).addTo(map);
+  playSeries(norm, water);
+});
+document.getElementById("listen-season").addEventListener("click", () => {
+  const z = Z(); if (!z) return;
+  let vals, label, color;
+  if (state.zone === "massira") {
+    const a = z.dates.map(d => d.partial ? null : d.lake_km2), v = a.filter(x => x != null);
+    const lo = Math.min(...v), hi = Math.max(...v);
+    vals = a.map(x => x == null ? null : (x - lo) / Math.max(0.01, hi - lo)); label = t().lake + " · km²"; color = "#38bdf8";
+  } else {
+    const a = z.dates.map(d => d.green_km2), lo = Math.min(...a), hi = Math.max(...a);
+    vals = a.map(x => (x - lo) / Math.max(0.01, hi - lo)); label = t().green + " · km²"; color = "#a3e635";
+  }
+  drawSpark(vals, label, color); playSeries(vals);
+});
+document.getElementById("listen-stop").addEventListener("click", stopSound);
+
+// ---------------------------------------------------------------- charts
+Chart.defaults.color = "#93a1ba";
+Chart.defaults.font.family = "IBM Plex Sans, sans-serif";
+Chart.defaults.borderColor = "rgba(147,161,186,.14)";
+const tickDate = v => new Date(v).toLocaleDateString(lang === "fr" ? "fr-FR" : "en-GB",
+  lakeRange === "all" ? { month: "short", year: "2-digit", timeZone: "UTC" } : { day: "numeric", month: "short", timeZone: "UTC" });
+let chLake = null, chGreen = null, lakeRange = "radar";
+function buildCharts() {
+  if (chLake) chLake.destroy(); if (chGreen) chGreen.destroy();
+  const L = t();
+  if (ZM) {
+    const offPts = official.map(o => ({ x: Date.parse(o.date), y: o.fill_pct }));
+    const radPts = fullLake.map(d => ({ x: Date.parse(d.date), y: d.lake_km2 }));
+    const wide = lakeRange === "all";
+    const xmin = wide ? Math.min(offPts[0]?.x ?? Infinity, radPts[0].x) - 15 * 864e5 : radPts[0].x - 20 * 864e5;
+    const xmax = Math.max(offPts.at(-1)?.x ?? 0, radPts.at(-1).x) + 15 * 864e5;
+    const inWin = offPts.filter(p => p.x >= xmin && p.x <= xmax).map(p => p.y);
+    const y2min = wide ? 0 : Math.floor(Math.min(...inWin) - 1), y2max = wide ? 50 : Math.ceil(Math.max(...inWin) + 1);
+    const lakeVals = radPts.map(p => p.y);
+    chLake = new Chart(document.getElementById("chart-lake"), {
+      data: { datasets: [
+        { type: "line", label: L.official, data: offPts, yAxisID: "y2", borderColor: "#f2a541", backgroundColor: "rgba(242,165,65,.10)", fill: true, tension: 0.25, pointRadius: 3, pointBackgroundColor: "#f2a541" },
+        { type: "scatter", label: L.radar_area, data: radPts, yAxisID: "y", borderColor: "#38bdf8", backgroundColor: "#38bdf8", pointRadius: radPts.map(() => 4), pointHoverRadius: 7 }
+      ] },
+      options: { maintainAspectRatio: false, animation: false, interaction: { mode: "nearest", intersect: false },
+        scales: {
+          x: { type: "linear", min: xmin, max: xmax, ticks: { callback: tickDate, maxTicksLimit: 10 } },
+          y: { position: "left", title: { display: true, text: L.radar_area, color: "#38bdf8" }, suggestedMin: Math.floor(Math.min(...lakeVals) - 3), suggestedMax: Math.ceil(Math.max(...lakeVals) + 3) },
+          y2: { position: "right", min: y2min, max: y2max, grid: { drawOnChartArea: false }, title: { display: true, text: L.official, color: "#f2a541" } } },
+        plugins: { legend: { labels: { usePointStyle: true } },
+          tooltip: { callbacks: { title: it => fmtDate(new Date(it[0].parsed.x).toISOString().slice(0, 10)),
+            label: it => it.datasetIndex === 0 ? ` ${nf(it.parsed.y, 2)} %` : ` ${nf(it.parsed.y, 2)} km²` } } } }
+    });
+  }
+  if (ZD) {
+    const pts = ZD.dates.map(d => ({ x: Date.parse(d.date), y: d.green_km2 }));
+    chGreen = new Chart(document.getElementById("chart-green"), {
+      type: "line",
+      data: { datasets: [{ label: L.green + " (km²)", data: pts, borderColor: "#a3e635", backgroundColor: "rgba(163,230,53,.14)", fill: true, tension: 0.3, pointRadius: pts.map(() => 4), pointBackgroundColor: "#a3e635" }] },
+      options: { maintainAspectRatio: false, animation: false,
+        scales: { x: { type: "linear", ticks: { callback: v => new Date(v).toLocaleDateString(lang === "fr" ? "fr-FR" : "en-GB", { day: "numeric", month: "short", timeZone: "UTC" }), maxTicksLimit: 8 } }, y: { beginAtZero: true } },
+        plugins: { legend: { display: false }, tooltip: { callbacks: { title: it => fmtDate(new Date(it[0].parsed.x).toISOString().slice(0, 10)), label: it => ` ${nf(it.parsed.y, 0)} km²` } } } }
+    });
+  }
+  highlightCharts();
+}
+function highlightCharts() {
+  if (chLake && state.zone === "massira") {
+    const cur = ZM.dates[state.idx.massira];
+    chLake.data.datasets[1].pointRadius = fullLake.map(d => d.key === cur.key ? 8 : 4);
+    chLake.update("none");
+  }
+  if (chGreen && state.zone === "doukkala") {
+    chGreen.data.datasets[0].pointRadius = ZD.dates.map((d, i) => i === state.idx.doukkala ? 8 : 4);
+    chGreen.update("none");
+  }
+}
+
+// ---------------------------------------------------------------- static panels
+function renderPanels() {
+  const L = t();
+  // KPIs
+  if (ZM) {
+    const a = fullLake[0], b = fullLake.at(-1);
+    document.getElementById("k-lake").innerHTML = `${nf(b.lake_km2)} <small>${L.km2}</small>`;
+    const dl = b.lake_km2 - a.lake_km2;
+    document.getElementById("k-lake-sub").textContent = `${dl >= 0 ? "+" : ""}${nf(dl, 1)} ${L.km2} ${L.delta_first} ${fmtDate(a.date)}`;
+    const lastOff = official.at(-1), prev = official.find(o => o.date.startsWith("2025-07")) || official[0];
+    if (lastOff) {
+      document.getElementById("k-fill").innerHTML = `${nf(lastOff.fill_pct)} <small>%</small>`;
+      document.getElementById("k-fill-sub").textContent = `${fmtDate(lastOff.date)} · ${lang === "fr" ? "contre" : "vs"} ${nf(prev.fill_pct)} % ${L.fill_on} ${fmtDate(prev.date)}`;
+    }
+  }
+  if (ZD) document.getElementById("k-crop").innerHTML = `${nf(ZD.classes.crop.km2 * 100, 0)} <small>${L.ha}</small>`;
+  // class bars
+  if (ZD) {
+    const tot = Object.values(ZD.classes).reduce((s, c) => s + c.km2, 0);
+    document.getElementById("class-bars").innerHTML = Object.entries(ZD.classes).map(([k, c]) =>
+      `<div class="bar"><span>${L.cls[k]}</span><div class="track"><div class="fillb" style="width:${(c.km2 / tot * 100).toFixed(1)}%;background:${c.color}"></div></div><span class="v">${nf(c.km2, 0)} ${L.km2}</span></div>`).join("");
+    const pk = ZD.peak_km2_by_month, mx = Math.max(...Object.values(pk));
+    document.getElementById("peak-bars").innerHTML = Object.entries(pk).map(([m, v]) =>
+      `<div class="bar"><span>${L.months[m]}</span><div class="track"><div class="fillb" style="width:${(v / mx * 100).toFixed(1)}%;background:${ZD.month_colors[m]}"></div></div><span class="v">${nf(v, 0)} ${L.km2}</span></div>`).join("");
+  }
+  // budget
+  const B = D.budget;
+  if (B) {
+    document.getElementById("budget-lead").textContent = L.b_lead(B);
+    const dv = B.volume_mm3_to - B.volume_mm3_from, dl = B.lake_km2_to - B.lake_km2_from;
+    document.getElementById("budget").innerHTML = `
+      <div class="card"><div class="muted">${L.b_vol}</div><div class="big">${dv >= 0 ? "+" : "−"}${nf(Math.abs(dv), 0)} <small>Mm³</small></div><div class="muted num">${nf(B.volume_mm3_from, 0)} → ${nf(B.volume_mm3_to, 0)} Mm³ · ${nf(B.fill_from)} → ${nf(B.fill_to)} %</div></div>
+      <div class="arrow" aria-hidden="true">→</div>
+      <div class="card"><div class="muted">${L.b_lake}</div><div class="big">${dl >= 0 ? "+" : "−"}${nf(Math.abs(dl), 1)} <small>km²</small></div><div class="muted num">${nf(B.lake_km2_from)} → ${nf(B.lake_km2_to)} km²</div></div>
+      <div class="arrow" aria-hidden="true">→</div>
+      <div class="card"><div class="muted">${L.b_crop}</div><div class="big">${B.crop_km2 != null ? nf(B.crop_km2 * 100, 0) : "–"} <small>ha</small></div><div class="muted">${lang === "fr" ? "ont poussé en saison sèche dans les Doukkala" : "grew during the dry season in the Doukkala"}</div></div>`;
+  }
+  // sources
+  const seen = new Set();
+  document.getElementById("sources").innerHTML = official.filter(o => !seen.has(o.url) && seen.add(o.url))
+    .map(o => `<li><a href="${o.url}" target="_blank" rel="noopener">${o.source}</a> · ${fmtDate(o.date)}</li>`).join("");
+}
+
+function applyLang(l) {
+  lang = l;
+  try { localStorage.setItem("nabd-lang", l); } catch (e) {}
+  document.documentElement.lang = l;
+  document.getElementById("lang-fr").setAttribute("aria-pressed", l === "fr");
+  document.getElementById("lang-en").setAttribute("aria-pressed", l === "en");
+  const dict = l === "en" ? EN : FR;
+  document.querySelectorAll("[data-i18n]").forEach(el => { if (dict[el.dataset.i18n]) el.textContent = dict[el.dataset.i18n]; });
+  renderPanels(); renderToggles(); renderLegend(); buildCharts(); setIndex(state.idx[state.zone]);
+  drawSpark([], l === "fr" ? "Cliquez sur la carte" : "Click the map", "#93a1ba");
+}
+function setRange(r) {
+  lakeRange = r;
+  document.getElementById("r-radar").setAttribute("aria-pressed", r === "radar");
+  document.getElementById("r-all").setAttribute("aria-pressed", r === "all");
+  buildCharts();
+}
+document.getElementById("r-radar").addEventListener("click", () => setRange("radar"));
+document.getElementById("r-all").addEventListener("click", () => setRange("all"));
+document.getElementById("lang-fr").addEventListener("click", () => applyLang("fr"));
+document.getElementById("lang-en").addEventListener("click", () => applyLang("en"));
+
+// ---------------------------------------------------------------- start
+document.getElementById("demo-banner").hidden = !D.demo;
+const all = L.latLngBounds([]); Object.values(D.zones).forEach(z => all.extend(z.bounds));
+map.fitBounds(all, { padding: [12, 12] });
+syncLayers();
+setZone(state.zone, false);
+applyLang(lang);
+})();
+</script>
+</body>
+</html>
