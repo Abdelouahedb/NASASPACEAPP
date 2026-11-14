@@ -19,6 +19,10 @@ Activez « Synchroniser barrage et champs » pour suivre la même acquisition da
 
 À Al Massira, le masque retient l'eau sombre reliée à un point au cœur du réservoir dans une limite tracée à la main. Les seuils fixes sont −15 dB (HH) et −24 dB (HV). Dans les Doukkala, les classes reposent sur les pixels observés à chaque date et sur des règles radar exploratoires. L'irrigation par parcelle demande une validation indépendante.
 
+## Ouvrir le tableau de bord
+
+Téléchargez et décompressez le ZIP du dépôt, puis ouvrez `web/index.html` dans Chrome ou Edge. Les images radar, les graphiques et le son fonctionnent hors ligne. Le fond satellite Esri et les liens vers les sources requièrent Internet. Gardez les dossiers `web/data` et `web/vendor` avec la page.
+
 ## Installation (une fois)
 
 ```bash
