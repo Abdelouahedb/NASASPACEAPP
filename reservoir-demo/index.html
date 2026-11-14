@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How the Loukkos shoreline moved | NullPointers</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#131d1b;color:#f3f1e8;font:16px "DM Sans",system-ui,sans-serif}main{max-width:1440px;margin:auto;padding:24px clamp(18px,5vw,74px)}header,footer{display:flex;justify-content:space-between;gap:16px;color:#b7c6ba;font-size:.82rem}header{padding-bottom:18px;border-bottom:1px solid #40514a}.layout{display:grid;grid-template-columns:minmax(240px,1fr) minmax(0,2.6fr);gap:clamp(22px,4vw,62px);align-items:center;padding:36px 0}h1{font:400 clamp(42px,5.4vw,88px)/.94 "Instrument Serif",Georgia,serif;letter-spacing:-.055em;margin:12px 0 20px}p{line-height:1.54;color:#c2cec4;margin:0 0 18px}.place{color:#c4d6bc;font-size:.82rem}.estimate{font-size:clamp(26px,3.2vw,44px);color:#ffb179;letter-spacing:-.06em;display:block;margin-top:25px}.note{font-size:.84rem}figure{margin:0;min-width:0}.map{position:relative;aspect-ratio:820/408;overflow:hidden;background:#56605b;--wipe:52%;border:1px solid #68786e}.map img{position:absolute;inset:0;width:100%;height:100%}.before{clip-path:inset(0 calc(100% - var(--wipe)) 0 0)}.loss{clip-path:inset(0 0 0 var(--wipe))}.line{position:absolute;left:var(--wipe);height:100%;width:2px;background:#fff;pointer-events:none;transform:translateX(-50%)}.line::after{content:'‹ ›';display:grid;place-items:center;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:#f5f1e7;color:#15201d;border-radius:50%;width:42px;height:42px;font-size:22px;box-shadow:0 0 0 1px #15201d}.map input{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:ew-resize}.map:focus-within{outline:3px solid #ffc397;outline-offset:3px}.date{position:absolute;top:12px;background:#16201dec;padding:6px 9px;font:12px ui-monospace,monospace;pointer-events:none}.left{left:12px}.right{right:12px}.controls{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}button{font:inherit;color:inherit;background:#263632;border:1px solid #637971;padding:8px 12px;border-radius:4px;cursor:pointer}button:hover{background:#3b5149}button[aria-pressed=true]{background:#ffb179;color:#151d1a;border-color:#ffb179}button:focus-visible,a:focus-visible{outline:2px solid #ffb179;outline-offset:3px}.legend{font-size:.8rem;min-height:1.3em;margin:8px 0 0}footer{border-top:1px solid #40514a;padding-top:16px;flex-wrap:wrap}a{color:#d0e6c6}details{font-size:.85rem;margin-top:18px;color:#b7c6ba}summary{cursor:pointer}details p{margin-top:9px}@media(max-width:760px){.layout{grid-template-columns:1fr;padding:25px 0;gap:16px}h1{margin-bottom:12px}.estimate{margin-top:10px}p{margin-bottom:8px}}
+</style>
+<main>
+<header><strong>NullPointers</strong><span>NASA Space Apps 2026</span></header>
+<section class="layout">
+<div>
+<div class="place">Oued El Makhazine · Morocco</div>
+<h1>How the shoreline moved</h1>
+<p>Drag across two NISAR radar passes to see where the reservoir’s northeastern arm narrowed.</p>
+<strong class="estimate">1.9–2.6 km²</strong>
+<p class="note">Preliminary net open-water loss in the northeastern arm study window.</p>
+</div>
+<figure aria-label="Northeastern arm radar comparison">
+<div class="map" id="map">
+<img src="august.png" alt="August radar image showing the narrower channel">
+<img class="before" id="before" src="june.png" alt="June radar image showing the wider reservoir arm">
+<img class="loss" id="loss" src="change.png" alt="Areas classified as water loss across several thresholds" hidden>
+<div class="line" id="line" aria-hidden="true"></div>
+<span class="date left" id="june">20 JUN 2026</span><span class="date right" id="aug">31 AUG 2026</span>
+<input type="range" id="wipe" min="0" max="100" value="52" aria-label="June image reveal percentage">
+</div>
+<div class="controls" aria-label="Comparison controls">
+<button id="compare" aria-pressed="true">Compare</button>
+<button id="change" aria-pressed="false">Show estimated water loss</button>
+</div>
+<p class="legend" id="legend" aria-live="polite">Drag the divider or use the arrow keys.</p>
+</figure>
+</section>
+<footer><span>NISAR L2 GCOV · Frequency A HH · Track 095</span><a href="https://cmr.earthdata.nasa.gov/search/granules.json?concept_id=G4244516497-ASF&amp;concept_id=G4297725019-ASF">NASA scene metadata</a></footer>
+<details><summary>How the estimate was made</summary><p>Both scenes use the same brightness scale. We smoothed the images and tested five radar-brightness thresholds within a manually drawn reservoir boundary. The range represents sensitivity to the threshold. Independent validation against optical imagery is pending. The overlay shows where estimated open water was lost.</p></details>
+</main>
+<script>
+const byId = (id) => document.getElementById(id);
+const wipe = byId('wipe');
+function updateWipe() {
+  byId('map').style.setProperty('--wipe', wipe.value + '%');
+  byId('june').hidden = wipe.value < 17;
+  byId('aug').hidden = wipe.value > 83;
+}
+function setMode(showLoss) {
+  byId('loss').hidden = !showLoss;
+  byId('before').hidden = showLoss;
+  byId('line').hidden = showLoss;
+  wipe.hidden = showLoss;
+  byId('june').hidden = showLoss;
+  byId('aug').hidden = false;
+  byId('map').style.setProperty('--wipe', '0%');
+  if (!showLoss) updateWipe();
+  byId('compare').setAttribute('aria-pressed', String(!showLoss));
+  byId('change').setAttribute('aria-pressed', String(showLoss));
+  byId('legend').textContent = showLoss
+    ? 'Bright orange: loss in 5 of 5 thresholds. Pale orange: loss in 3–4.'
+    : 'Drag the divider or use the arrow keys.';
+}
+wipe.addEventListener('input', updateWipe);
+byId('compare').addEventListener('click', () => setMode(false));
+byId('change').addEventListener('click', () => setMode(true));
+</script>
+</html>
