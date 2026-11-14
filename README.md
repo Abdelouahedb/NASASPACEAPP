@@ -21,7 +21,7 @@ Activez « Synchroniser barrage et champs » pour suivre la même acquisition da
 
 ## Ouvrir le tableau de bord
 
-Téléchargez et décompressez le ZIP du dépôt, puis ouvrez `web/index.html` dans Chrome ou Edge. Les images radar, les graphiques et le son fonctionnent hors ligne. Le fond satellite Esri et les liens vers les sources requièrent Internet. Gardez les dossiers `web/data` et `web/vendor` avec la page.
+[Téléchargez le ZIP de NABD](https://github.com/Alaeddine-Elouaddah/NASASPACEAPP/archive/refs/heads/main.zip), décompressez-le, puis ouvrez `web/index.html` dans Chrome ou Edge. Les images radar, les graphiques et le son fonctionnent hors ligne. Le fond satellite Esri et les liens vers les sources requièrent Internet. Gardez les dossiers `web/data` et `web/vendor` avec la page.
 
 ## Installation (une fois)
 
@@ -82,8 +82,9 @@ RESSOURCES.md            analyse des ressources du défi
 
 ## Mise en ligne (open source)
 
-Créez un dépôt GitHub public, poussez le dossier, puis dans Settings → Pages choisissez la branche `main`
-et le dossier `/web`. Le fond de carte satellite Esri s'affiche une fois le site en ligne.
+Dans [Settings → Pages](https://github.com/Alaeddine-Elouaddah/NASASPACEAPP/settings/pages), un administrateur ou mainteneur du dépôt peut sélectionner **Deploy from a branch → gh-pages → /(root)**, puis enregistrer. GitHub affichera l’adresse de la démo une fois le déploiement terminé.
+
+La branche `gh-pages` contient le dossier `web` à sa racine. Après une mise à jour du tableau de bord sur `main`, publiez la nouvelle version avec `git subtree push --prefix=web origin gh-pages`.
 
 ## Limites, à dire honnêtement au jury
 
