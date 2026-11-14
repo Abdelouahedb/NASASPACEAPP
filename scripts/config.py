@@ -15,6 +15,15 @@ ZONES = {
         "bbox": (-7.70, 32.38, -7.35, 32.55),     # west, south, east, north
         "pixel_m": 20.0,
         "crs": "EPSG:32629",
+        # Broad hand-drawn analysis boundary around the visible reservoir, in lon/lat.
+        "water_boundary": [
+            (-7.643, 32.511), (-7.592, 32.515), (-7.560, 32.487),
+            (-7.510, 32.485), (-7.450, 32.478), (-7.430, 32.450),
+            (-7.456, 32.425), (-7.495, 32.407), (-7.544, 32.409),
+            (-7.600, 32.425), (-7.653, 32.440), (-7.649, 32.483),
+        ],
+        "water_seed": (-7.55, 32.445),
+        "water_thresholds_db": (-15.0, -24.0),
     },
     "doukkala": {
         "name": "Périmètre irrigué des Doukkala",

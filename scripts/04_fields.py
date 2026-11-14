@@ -16,6 +16,7 @@ Also: green-cover area per date, and the month each crop peaked (a crop calendar
 import argparse
 import json
 from collections import Counter
+from pathlib import Path
 
 import numpy as np
 
@@ -29,15 +30,21 @@ CLASSES = {
     4: ("crop", "Culture active (irriguée)", (163, 230, 53)),
     5: ("bare", "Sol nu / jachère", (180, 140, 90)),
 }
+MIN_SCENES = 3
 MONTH_COLORS = {6: (250, 204, 21), 7: (251, 146, 60), 8: (239, 68, 68), 9: (168, 85, 247), 10: (59, 130, 246)}
 
 
 def classify(hh, hv):
     r = C.FIELD_RULES
-    valid = np.isfinite(hv).sum(0) >= max(3, hv.shape[0] // 2)
-    with np.errstate(invalid="ignore"), np.errstate(all="ignore"):
-        mhv, mhh, shv = np.nanmean(hv, 0), np.nanmean(hh, 0), np.nanstd(hv, 0)
-        p10, p90 = np.nanpercentile(hv, 10, axis=0), np.nanpercentile(hv, 90, axis=0)
+    valid = (np.isfinite(hv) & np.isfinite(hh)).all(axis=0)
+    sample_hv = hv[:, valid]
+    sample_hh = hh[:, valid]
+    mhv = np.full(valid.shape, np.nan, dtype="float32")
+    mhh, shv, p10, p90 = (mhv.copy() for _ in range(4))
+    mhv[valid] = sample_hv.mean(axis=0)
+    mhh[valid] = sample_hh.mean(axis=0)
+    shv[valid] = sample_hv.std(axis=0)
+    p10[valid], p90[valid] = np.percentile(sample_hv, [10, 90], axis=0)
     cls = np.zeros(hv.shape[1:], np.uint8)
     cls[valid] = 5
     crop = valid & ((p90 - p10) >= r["crop_range_min"]) & (p90 >= r["crop_peak_min"])
@@ -57,15 +64,14 @@ def main():
     paths, grid = C.zone_paths(zone), Grid(zone)
     for k in ("layers", "work"):
         paths[k].mkdir(parents=True, exist_ok=True)
-    for old in [*paths["layers"].glob("*.png"), *paths["layers"].glob("*.webp")]:
-        old.unlink()
-
     items = scenes(zone)
     if not items:
         print(f"No data in {paths['raw']}. Run 02_download.py --zone {zone} (or 00_make_demo.py).")
         return
     track = args.track or Counter(i["track"] for i, _, _ in items).most_common(1)[0][0]
     items = [t for t in items if t[0]["track"] == track]
+    if len(items) < MIN_SCENES:
+        raise SystemExit(f"Track {track} needs at least {MIN_SCENES} acquisitions for the field analysis")
     print(f"Using track {track} ({items[0][0]['direction']}), {len(items)} dates")
 
     hh_s, hv_s, records = [], [], []
@@ -80,6 +86,8 @@ def main():
     hh_s, hv_s = np.stack(hh_s), np.stack(hv_s)
 
     cls = classify(hh_s, hv_s)
+    if not cls.any():
+        raise SystemExit("No pixels have coverage across all field acquisitions")
     grid.save_tif(paths["work"] / "classes.tif", cls)
     farmland = (cls == 4) | (cls == 5)
     for rec, hv in zip(records, hv_s):
@@ -122,6 +130,10 @@ def main():
         "cube": {**encode_cube(grid, hv_s), "keys": [r["key"] for r in records]},
     }
     paths["json"].write_text(json.dumps(out), encoding="utf-8")
+    expected = {Path(r["radar"]).name for r in records}
+    for image in paths["layers"].glob("radar_*.webp"):
+        if image.name not in expected:
+            image.unlink()
     print("\nAreas (km2):", areas)
     print("Next: python scripts/05_export.py")
 

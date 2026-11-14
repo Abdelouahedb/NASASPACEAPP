@@ -11,6 +11,14 @@ NABD suit l'eau d'un système marocain du barrage jusqu'aux champs avec le radar
 
 Avec en plus le mode « écouter la Terre » : on clique sur un point de la carte et sa série radar devient une mélodie (gamme Hijaz, rythme de darbouka).
 
+## Données et démonstration
+
+Le tableau de bord inclut quatre acquisitions NISAR L2 GCOV provisoires de la même orbite ascendante (044, trame 018), les 17 juin, 23 juillet, 28 août et 15 octobre 2026. Les bandes HH et HV de chaque acquisition ont été découpées par Harmony pour Al Massira et les Doukkala. Le lien « Source NASA de ce passage » affiche la fiche du produit.
+
+Activez « Synchroniser barrage et champs » pour suivre la même acquisition dans les deux zones. « Écouter le duo » anime leur chronologie et joue deux voix, le lac à gauche et le signal de végétation des champs à droite. Chaque série est normalisée indépendamment. Les accords comparent la chronologie de deux indicateurs et ne mesurent pas les lâchers d'eau.
+
+À Al Massira, le masque retient l'eau sombre reliée à un point au cœur du réservoir dans une limite tracée à la main. Les seuils fixes sont −15 dB (HH) et −24 dB (HV). Dans les Doukkala, les classes reposent sur les pixels observés à chaque date et sur des règles radar exploratoires. L'irrigation par parcelle demande une validation indépendante.
+
 ## Installation (une fois)
 
 ```bash
