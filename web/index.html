@@ -75,6 +75,9 @@ header { border-bottom: 1px solid var(--line); }
 .rail { display: flex; flex-direction: column; gap: 12px; }
 .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 14px; }
 .card h3 { font-size: 15px; margin-bottom: 8px; }
+.card-actions { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.mini-btn { background: rgba(242,165,65,.08); border: 1px solid rgba(242,165,65,.45); color: var(--saffron); border-radius: 8px; padding: 7px 10px; font: 600 12.5px var(--body); cursor: pointer; }
+.mini-btn:hover { background: rgba(242,165,65,.14); }
 .tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .tabs button { background: var(--panel-2); border: 1px solid var(--line); color: var(--muted); border-radius: 8px; padding: 9px 8px; font: 600 13.5px var(--body); cursor: pointer; text-align: left; }
 .tabs button span { display: block; font-weight: 400; font-size: 12px; }
@@ -176,9 +179,12 @@ footer li { margin-bottom: 4px; break-inside: avoid; }
     <div id="map" role="region" aria-label="Carte radar"></div>
     <aside class="rail">
       <div class="card">
-        <div class="tabs" role="group" aria-label="Zone">
-          <button id="tab-massira" aria-pressed="true"><span data-i18n="t_supply">L'offre</span>Al Massira</button>
-          <button id="tab-doukkala" aria-pressed="false"><span data-i18n="t_demand">La demande</span>Doukkala</button>
+        <div class="card-actions">
+          <div class="tabs" role="group" aria-label="Zone" style="flex:1">
+            <button id="tab-massira" aria-pressed="true"><span data-i18n="t_supply">L'offre</span>Al Massira</button>
+            <button id="tab-doukkala" aria-pressed="false"><span data-i18n="t_demand">La demande</span>Doukkala</button>
+          </div>
+          <button id="fit-all" class="mini-btn" type="button" data-i18n="fit_view" aria-label="Recentrer la vue">Vue complète</button>
         </div>
       </div>
       <div class="card">
@@ -273,8 +279,7 @@ const EN = {
   h_intro: "Where does the water come from, and where does it go?",
   p_intro: "Al Massira, Morocco's second-largest reservoir, is recovering after seven years of drought. Its releases irrigate the Doukkala plain. The NISAR radar (NASA–ISRO, L-band) sees both through clouds, day and night, every 12 days: the lake breathing, and fields growing in the middle of the dry summer.",
   k_lake: "Lake area (radar)", k_fill: "Official fill rate", k_crop: "Active summer crops (radar)", k_crop_sub: "Doukkala irrigated plain",
-  t_supply: "Supply", t_demand: "Demand", layers: "Layers",
-  listen_h: "Listen to the Earth",
+  t_supply: "Supply", t_demand: "Demand", layers: "Layers", fit_view: "Reset view", fit_view: "Reset view",  listen_h: "Listen to the Earth",
   listen_hint: "Click anywhere on the map: the radar time series of that spot becomes a melody. Water sounds low, a growing crop rises.",
   listen_season: "Play the season", stop: "Stop",
   h_lake: "The lake: radar versus official figures",
@@ -386,6 +391,14 @@ const state = { zone: ZM ? "massira" : "doukkala", idx: {}, on: { radar: true, w
 if (ZM) state.idx.massira = ZM.dates.length - 1;
 if (ZD) state.idx.doukkala = ZD.dates.length - 1;
 const Z = () => D.zones[state.zone];
+const studyBounds = L.latLngBounds([]);
+Object.values(D.zones).forEach(z => studyBounds.extend(z.bounds));
+
+function fitStudyView() {
+  if (marker) { map.removeLayer(marker); marker = null; }
+  stopPlay();
+  map.fitBounds(studyBounds, { padding: [16, 16] });
+}
 
 const LAYER_DEFS = {
   massira: [["radar", "m_radar"], ["water", "m_water"], ["change", "m_change"], ["occurrence", "m_occ"]],
@@ -485,6 +498,7 @@ function setZone(z, fit = true) {
 }
 document.getElementById("tab-massira").addEventListener("click", () => setZone("massira"));
 document.getElementById("tab-doukkala").addEventListener("click", () => setZone("doukkala"));
+document.getElementById("fit-all").addEventListener("click", fitStudyView);
 
 // ---------------------------------------------------------------- sound
 let ac = null, playing = [];
@@ -682,6 +696,10 @@ function applyLang(l) {
   document.getElementById("lang-en").setAttribute("aria-pressed", l === "en");
   const dict = l === "en" ? EN : FR;
   document.querySelectorAll("[data-i18n]").forEach(el => { if (dict[el.dataset.i18n]) el.textContent = dict[el.dataset.i18n]; });
+  const fitBtn = document.getElementById("fit-all");
+  if (fitBtn) {
+    fitBtn.setAttribute("aria-label", dict.fit_view || fitBtn.getAttribute("aria-label"));
+  }
   renderPanels(); renderToggles(); renderLegend(); buildCharts(); setIndex(state.idx[state.zone]);
   drawSpark([], l === "fr" ? "Cliquez sur la carte" : "Click the map", "#93a1ba");
 }
@@ -698,8 +716,7 @@ document.getElementById("lang-en").addEventListener("click", () => applyLang("en
 
 // ---------------------------------------------------------------- start
 document.getElementById("demo-banner").hidden = !D.demo;
-const all = L.latLngBounds([]); Object.values(D.zones).forEach(z => all.extend(z.bounds));
-map.fitBounds(all, { padding: [12, 12] });
+map.fitBounds(studyBounds, { padding: [12, 12] });
 syncLayers();
 setZone(state.zone, false);
 applyLang(lang);
