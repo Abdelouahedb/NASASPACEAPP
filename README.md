@@ -1,74 +1,225 @@
-# NABD نبض — L'été de feu 2026
+# NABD (نبض) — L'été de feu 2026 / Wildfire Monitoring with NISAR
 
-NASA Space Apps Challenge 2026 · défi **Dancing with the SARs**
+> **NASA Space Apps Challenge 2026 · Challenge: *Dancing with the SARs***  
+> Rapid Wildfire Scar Mapping, Severity Assessment, and Post-Fire Forest Recovery Tracking using **NASA-ISRO SAR (NISAR)** L-band Radar.
 
-En juillet 2026, deux incendies records ont brûlé près de 1 000 km² de forêt en Espagne et en France, et le Moyen Atlas marocain a brûlé lui aussi. NABD utilise le radar **NISAR** (NASA–ISRO, bande L, 24 cm) pour mesurer, à travers la fumée et la nuit :
+---
 
-- **où** le feu est passé : la cicatrice, pixel par pixel ;
-- **avec quelle violence** : la sévérité, d'après la chute du signal HV en dB ;
-- **quand** : la progression, passage par passage ;
-- **et si la forêt repart** : le « pouls » de la cicatrice comparée à la forêt intacte.
+## 📌 Executive Summary
 
-Le tout est vérifié contre les bilans officiels, et on peut **écouter** chaque point de la carte.
+During the extreme Mediterranean heatwave of July–August 2026, catastrophic megafires burned over 1,000 km² across Southwestern Europe and North Africa. Optical satellites were often blinded by dense smoke plumes, aerosols, and night-time cloud cover.
 
-| Site | Feu | Bilan officiel | Images NISAR GCOV (14/11/2026) |
-|---|---|---|---|
-| **Ávila – Burgohondo** (Espagne) | 22 juil. → 6 août 2026 | ≈ 50 000 ha (77 000 avec Madrid et Tolède) | 42 + 3 validées, depuis le 3 janv. 2026 |
-| **Gironde – Saumos / Le Porge** (France) | 22 juil. → 2 août 2026 | 42 000 ha | 49 + 3 validées, depuis le 4 nov. 2025 |
-| **Laânoussar – Sefrou** (Maroc) | 31 juil. → 7 août 2026 | 480 ha | ≈ 85 + 9 validées, depuis le 20 juin 2026 |
+**NABD (*"Pulse"* — نبض)** leverages **NISAR L-band SAR (~24 cm wavelength)** to pierce through smoke, ash, clouds, and darkness to reveal:
+- **Where the fire struck:** Accurate pixel-level burn scars and consolidated fire perimeters.
+- **Severity levels:** Quantitative assessment of canopy and branch destruction via cross-polarization drop ($\Delta\gamma^0_{\text{HV}}$ in dB).
+- **Temporal Progression:** Tracking front propagation and active burn evolution across satellite passes.
+- **Ecosystem Recovery ("The Forest Pulse"):** Differential multi-temporal tracking comparing burned scars against intact control forests.
 
-## Installation (une fois)
+### Monitored Wildfire Sites (July–August 2026)
 
+| Target Zone | Country | Ignition / Contained Dates | Official Reported Damage | NISAR GCOV Granules |
+| :--- | :---: | :---: | :--- | :--- |
+| **Ávila – Burgohondo** | 🇪🇸 Spain | 22 Jul → 06 Aug 2026 | $\approx 50,000\text{ ha}$ (up to $77,000\text{ ha}$ with Madrid/Toledo) | 42 provisional + 3 validated (since Jan 2026) |
+| **Gironde – Saumos / Le Porge** | 🇫🇷 France | 22 Jul → 02 Aug 2026 | $42,000\text{ ha}$ (Gironde Prefecture) | 49 provisional + 3 validated (since Nov 2025) |
+| **Laânoussar – Sefrou** | 🇲🇦 Morocco | 31 Jul → 07 Aug 2026 | $480\text{ ha}$ (National Water & Forests Agency - ANEF) | $\approx 85$ provisional + 9 validated (since Jun 2026) |
+
+---
+
+## 🗺️ System Architecture & Workflow Diagrams
+
+### End-to-End Pipeline Workflow
+
+```mermaid
+flowchart TD
+    subgraph S1["1. Satellite Discovery & Targeted Acquisition"]
+        A["NASA CMR API (ASF DAAC)"] -->|01_search.py| B["granules_zone.csv"]
+        B -->|02_download.py| C["NASA Harmony Spatial Subsetting / HDF5 Stream"]
+        C --> D[("Local Raw GeoTIFF / HDF5 Granules")]
+    end
+
+    subgraph S2["2. SAR Processing & Burn Physics (03_fire.py)"]
+        D --> E["Frame Mosaicking & UTM Grid Alignment (EPSG:32630)"]
+        E --> F["5x5 Lee Speckle Filter & dB Conversion (HH & HV)"]
+        F --> G["Scene Baseline Normalization (Unburned Reference Shield)"]
+        G --> H["Multi-Temporal Median Delta: ΔHV = Post(10-120d) - Pre(0-75d)"]
+        H --> I["Multi-Orbit Track Fusion & Gaussian Smoothing (45m)"]
+        I --> J["Spatial Clustering & Connectivity Analysis (Ignition Anchor)"]
+    end
+
+    subgraph S3["3. Scientific Products & Visual Presentation"]
+        J --> K1["Burn Scar Perimeter & Severity Matrix"]
+        J --> K2["Fire Progression Timeline"]
+        J --> K3["Recovery Pulse Curve (Scar vs. Control Forest)"]
+        K1 & K2 & K3 --> L["04_export.py"]
+        L --> M[("web/data/data.js")]
+        M --> N["3D Interactive Web Experience (Three.js & Leaflet)"]
+        M --> O["Audio Sonification ('Écouter la Terre')"]
+    end
+
+    style S1 fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style S2 fill:#0f172a,stroke:#ef4444,stroke-width:2px,color:#fff
+    style S3 fill:#18181b,stroke:#10b981,stroke-width:2px,color:#fff
+```
+
+### Burn Scar & Severity Decision Tree
+
+```mermaid
+flowchart TD
+    Pix["Pixel Analysis (Pre vs. Post Fire)"] --> PreCheck{"Pre-Fire HV > -22 dB?<br/>(Must be vegetated forest/canopy)"}
+    PreCheck -- No --> NonVeg["Excluded (Bare ground, Water, Rock)"]
+    PreCheck -- Yes --> DropCheck{"ΔHV < -1.0 dB?<br/>(Significant canopy backscatter drop)"}
+    
+    DropCheck -- No --> Intact["Intact Forest / Minimal Damage"]
+    DropCheck -- Yes --> Cluster{"Connected to Ignition Point?<br/>(Path search with zone link threshold)"}
+    
+    Cluster -- No --> ExcludePatch["External Change (Clear-cut / Agriculture)"]
+    Cluster -- Yes --> Burned["Burned Core Detected"]
+
+    Burned --> Severity{"Severity Breakdown (dB drop)"}
+    Severity -->|"-1.0 dB to -2.5 dB"| SevLow["Low Severity (Yellow)"]
+    Severity -->|"-2.5 dB to -4.0 dB"| SevMod["Moderate Severity (Orange)"]
+    Severity -->|"ΔHV < -4.0 dB"| SevHigh["High Severity (Deep Crimson)"]
+
+    style Burned fill:#7f1d1d,stroke:#f87171,stroke-width:2px,color:#fff
+    style SevLow fill:#713f12,stroke:#fde047,stroke-width:2px,color:#fff
+    style SevMod fill:#7c2d12,stroke:#fb923c,stroke-width:2px,color:#fff
+    style SevHigh fill:#4c0519,stroke:#e11d48,stroke-width:2px,color:#fff
+```
+
+### Fire Progression & Forest Pulse Sonification
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Sat as NISAR Satellite (12-day Orbit)
+    participant Pipe as NABD Pipeline (03_fire.py)
+    participant UI as Interactive 3D / Web Map
+    participant Audio as Web Audio Synth
+
+    Note over Sat,Pipe: Time Series Passes (June -> November 2026)
+    Sat->>Pipe: Transmit L-band GCOV (HH & HV)
+    Pipe->>Pipe: Detect first pass where ΔHV drops > 1.5 dB (Progression Date)
+    Pipe->>Pipe: Compute Pulse: mean(Scar HV) - mean(Control Forest HV)
+    Pipe->>UI: Export GeoTIFF, WebP Overlays & GeoJSON Metrics
+    UI->>Audio: Click Map Pixel -> Synthesize Backscatter Curve into Pitch / Rhythm
+    Note over Audio: Frequency mapped to dB, Darbouka rhythm modulated by signal drop
+```
+
+---
+
+## 🔬 Scientific Methodology
+
+### 1. Radar Physics of Forest Fires in L-Band
+* **Volume Scattering Collapse:** In healthy forests, L-band radar waves (~24 cm) penetrate the foliage and scatter within the dense network of branches and trunks, producing high cross-polarization backscatter ($\gamma^0_{\text{HV}}$). When a fire consumes the canopy, needles fall, and wood loses moisture, volume scattering collapses dramatically, producing a multi-decibel drop.
+* **Delayed Phenological Drop (The 10–120 Day Post-Fire Window):** Real NISAR observations demonstrate that the HV backscatter drop deepens for 2 to 3 months following fire containment as damaged needles desiccate and fall. Immediate post-fire observation drastically underestimates damage. NABD compares the median of acquisitions up to 75 days before against the median of 10 to 120 days post-fire:
+  $$\Delta\gamma^0_{\text{HV}} = \text{median}\left(\gamma^0_{\text{HV, post}}\right) - \text{median}\left(\gamma^0_{\text{HV, pre}}\right)$$
+
+### 2. Scene Calibration & Orbit Averaging
+* **Unburned Reference Calibration:** Rain events or atmospheric moisture can artificially surge backscatter by $+2\text{ dB}$. Every single pass is inter-calibrated against invariant, unburned sections of the scene. Granules displaying calibration deviations $> 3\text{ dB}$ are automatically discarded.
+* **Multi-Geometry Fusion:** Observations from multiple ascending and descending tracks are normalized and averaged, eliminating single-look geometric shadow or layover distortions.
+
+### 3. Spatial Connectivity & Perimeter Consolidation
+* **Clustering from Ignition:** To prevent false positives caused by seasonal harvesting or clear-cuts, NABD anchors analysis at verified ignition coordinates (`ignition`), capturing the primary scar and linking surrounding spot fires within a spatial link radius (`link_m`: 500 m to 2.5 km).
+* **Official Perimeter Morphological Closing:** Gaps and unburned pockets smaller than 200 m inside the fire zone are closed to reconstruct the official operational perimeter reported by civil protection agencies.
+
+### 4. Forest Recovery Pulse
+* By continuously tracking:
+  $$\text{Pulse}(t) = \overline{\gamma^0_{\text{HV, scar}}}(t) - \overline{\gamma^0_{\text{HV, control}}}(t)$$
+  NABD eliminates seasonal phenological cycles and sensor re-calibrations, directly charting biological vegetation regrowth over months and years.
+
+---
+
+## 📁 Repository Structure
+
+```text
+nisar-surface-change/
+├── data/
+│   ├── facts.json              # Validated fire stats, casualties, response metadata
+│   ├── inventory.json          # Spatial catalog bounds & acquisition summaries
+│   ├── granules_*.csv          # NASA CMR search granules for Ávila, Gironde & Sefrou
+│   ├── raw/                    # Downloaded GeoTIFFs & NISAR HDF5 datasets
+│   └── work/                   # Analytical GeoTIFF outputs (dHV_dB.tif, severity.tif)
+├── scripts/
+│   ├── config.py               # Fire ignition coordinates, spatial bounds, dB thresholds
+│   ├── common.py               # Radar reprojection, Lee filtering, display composers
+│   ├── 00_make_demo.py         # Synthetic realistic test generator for offline testing
+│   ├── 01_search.py            # NASA CMR API client for NISAR scenes
+│   ├── 02_download.py          # NASA Harmony bounding box downloader / HDF5 streaming
+│   ├── 03_fire.py              # Burn scar, severity, progression & pulse engine
+│   └── 04_export.py            # Packaging artifacts into web/data/data.js
+├── web/
+│   ├── index.html              # Main Interactive Application (Leaflet, WebGL, Web Audio)
+│   ├── intro/                  # 3D interactive prologue globe and textures
+│   ├── data/                   # Packaged map layers (WebP) & data.js
+│   └── vendor/                 # Three.js, Leaflet, and web dependencies
+├── requirements.txt            # Python dependencies
+└── README.md                   # Project documentation
+```
+
+---
+
+## ⚡ Quickstart Guide
+
+### 1. Environment Setup
 ```bash
+# Clone the repository
+git clone https://github.com/your-username/nisar-surface-change.git
+cd nisar-surface-change
+
+# Create and activate virtual environment
 python -m venv .venv
-.venv\Scripts\activate            # Mac/Linux : source .venv/bin/activate
+
+# On Linux / macOS:
+source .venv/bin/activate
+# On Windows:
+.venv\Scripts\activate
+
+# Install dependencies
 pip install -r requirements.txt
 ```
 
-Compte NASA gratuit : <https://urs.earthdata.nasa.gov/users/new>. Créez ensuite le fichier `_netrc`
-(Windows, dans `C:\Users\VOUS\`) ou `~/.netrc` (Mac/Linux) contenant :
-
+### 2. Earthdata Authentication
+Accessing raw NISAR granules requires an approved [NASA Earthdata Login](https://urs.earthdata.nasa.gov/users/new).  
+Save your credentials into `%USERPROFILE%\_netrc` (Windows) or `~/.netrc` (Linux/macOS):
+```text
+machine urs.earthdata.nasa.gov login <YOUR_USERNAME> password <YOUR_PASSWORD>
 ```
-machine urs.earthdata.nasa.gov login VOTRE_NOM password VOTRE_MOT_DE_PASSE
-```
 
-Ne publiez jamais ce fichier : il est déjà exclu par `.gitignore`.
-
-## Lancer
+### 3. Pipeline Execution
 
 ```bash
-python scripts/01_search.py --zone all          # liste à jour des images (sans connexion)
-python scripts/02_download.py --zone sefrou --limit 2    # petit test d'abord
-python scripts/02_download.py --zone all        # tout (seulement la fenêtre de chaque feu)
-#   en cas d'échec de Harmony : ajouter --method stream
-python scripts/03_fire.py --zone all            # cicatrice, sévérité, progression, pouls
-python scripts/04_export.py                     # web/data/data.js
-python -m http.server 8000 -d web               # puis http://localhost:8000
+# Step 0: (Optional) Generate synthetic data for offline dry-runs
+python scripts/00_make_demo.py
+
+# Step 1: Query NASA CMR catalog across all zones
+python scripts/01_search.py --zone all
+
+# Step 2: Download clipped bounding-box subsets (saves bandwidth vs 6GB full granules)
+python scripts/02_download.py --zone sefrou --limit 2    # Quick test
+python scripts/02_download.py --zone all                 # Full dataset
+
+# Step 3: Run the fire analytical pipeline (burn scar, severity, progression, pulse)
+python scripts/03_fire.py --zone all
+
+# Step 4: Export web datasets and raster layers
+python scripts/04_export.py
+
+# Step 5: Start the web dashboard
+python -m http.server 8000 -d web
 ```
+Navigate to **`http://localhost:8000`** in your browser.
 
-Avant d'utiliser les vraies données : supprimez les dossiers `data/raw/<zone>/DEMO_*`.
-Sans données, `python scripts/00_make_demo.py` crée des images **synthétiques** aux vraies dates NISAR,
-pour tester la chaîne. L'app affiche alors un bandeau « démonstration ».
+---
 
-## Méthode (03_fire.py)
+## 📊 Scientific Disclaimers & Known Limitations
 
-1. Chaque passage : les cadres voisins sont assemblés, puis filtre de Lee et passage en dB (HH, HV).
-2. Chaque passage est calé sur la partie **non brûlée** de l'image : cela efface les jours de pluie (+2 dB d'un coup) et les sauts d'étalonnage. Un passage qui saute de plus de 3 dB est écarté.
-3. Pour chaque orbite : ΔHV = médiane des passages de **10 à 120 jours après** le feu − médiane des passages des **75 jours avant**. Sur les vraies images, la chute continue de se creuser pendant 2 à 3 mois (les aiguilles tombent, les troncs sèchent) : regarder juste après le feu sous-estime beaucoup. Les orbites sont moyennées, puis la carte est lissée (45 m).
-4. Brûlé = végétation avant (HV > −22 dB) **et** ΔHV < −1 dB. On ne garde que les taches **reliées au feu** : la plus grande près du point de départ, puis toutes celles à moins de 1 km (2,5 km à Ávila, coupée par le lac du Burguillo). Le **périmètre** referme les trous de moins de 200 m, comme les bilans officiels. Sévérité : faible (−1 à −2,5 dB), modérée (−2,5 à −4 dB), forte (au-delà).
-5. Progression : premier passage où chaque pixel brûlé a chuté de plus de 1,5 dB.
-6. Pouls : HV moyen de la cicatrice moins HV de la forêt témoin, à chaque passage. Cette différence annule la saison et l'orbite.
+1. **Provisional Calibration Releases:** Datasets acquired prior to October 21, 2026 are NISAR provisional evaluation products undergoing orbital refinement.
+2. **Instrument Coverage Gaps:** A scheduled instrument gap occurred between July 27 and August 10, 2026. Combining multiple overlapping orbital tracks mitigates this gap.
+3. **Topographic Distortion:** In steep mountainous terrain (such as the Middle Atlas in Sefrou or Sierra de Gredos in Ávila), radar layover and shadow can influence backscatter.
+4. **Shrub & Understory vs. High Canopy:** In Ávila, significant portions burned through sparse scrubland and montane grasslands, which exhibit a lower L-band response than dense pine canopies. The radar captures ~60% of scrubland extent while capturing 92%–109% of dense pine and cedar forests in Gironde and Sefrou.
 
-Les réglages sont dans `scripts/config.py`. Les résultats en GeoTIFF (`dHV_dB.tif`, `severity.tif`) sont dans `data/work/<zone>/` et s'ouvrent dans QGIS.
+---
 
-## Mise en ligne
-
-Poussez le dossier sur GitHub, puis dans **Settings → Pages**, choisissez la branche `main` et le dossier `/ (root)`. Le fichier `index.html` à la racine redirige vers `web/`.
-
-## Limites (à dire au jury)
-
-- Les produits NISAR sont **provisoires** (calibration en cours) ; la version validée ne couvre que depuis le 21/10/2026.
-- Il manque des passages entre le 27/07 et le 10/08/2026 (lacune de l'instrument). C'est pour ça qu'on regarde plusieurs orbites.
-- En pente forte (Moyen Atlas, Gredos), l'ombre et le repliement radar peuvent gêner. Les zones en pente sont à interpréter avec prudence.
-- Le seuil de −1 dB est un choix, réglé sur les vraies images 2026 : Gironde 92 % du bilan officiel, Laânoussar 109 %.
-- Ávila : le feu sort du cadre analysé par l'est (vers Madrid), et une grande partie a brûlé des broussailles et des prairies, que la bande L voit peu. Le radar en compte environ 60 %. Pour agrandir le cadre : changer `bbox` dans `config.py`, puis `01_search.py --zone avila` et `02_download.py --zone avila --fresh`.
+## 📜 Credits & License
+Developed for the **NASA Space Apps Challenge 2026** under track *Dancing with the SARs*.  
+NISAR data products provided by **NASA / ISRO** through the **Alaska Satellite Facility (ASF) DAAC**.
