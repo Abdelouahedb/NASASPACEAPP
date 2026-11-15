@@ -1,258 +1,225 @@
-# NABD (نبض) — The Pulse of Morocco's Water
+# NABD (نبض) — L'été de feu 2026 / Wildfire Monitoring with NISAR
 
-> **NASA Space Apps Challenge · Track: *Dancing with the SARs***  
-> Monitoring reservoir supply and agricultural demand using **NASA-ISRO SAR (NISAR)** L-band Radar.
+> **NASA Space Apps Challenge 2026 · Challenge: *Dancing with the SARs***  
+> Rapid Wildfire Scar Mapping, Severity Assessment, and Post-Fire Forest Recovery Tracking using **NASA-ISRO SAR (NISAR)** L-band Radar.
 
 ---
 
 ## 📌 Executive Summary
 
-**NABD** (*"Pulse"* in Arabic — **نبض**) connects space radar technology directly to national water security. Focusing on the hyper-critical water basin of Morocco, NABD monitors the end-to-end water cycle: from **reservoir storage (supply)** down to **field-level crop irrigation (demand)**.
+During the extreme Mediterranean heatwave of July–August 2026, catastrophic megafires burned over 1,000 km² across Southwestern Europe and North Africa. Optical satellites were often blinded by dense smoke plumes, aerosols, and night-time cloud cover.
 
-| Component | Target Area | Role in System | Radar Observation |
-| :--- | :--- | :--- | :--- |
-| **Al Massira Reservoir** | Settat / Rehamna (`32.47°N, -7.64°W`) | **Supply** | Water surface area evolution across satellite passes vs. national dam fill levels. |
-| **Doukkala Plain** | Sidi Bennour / Zemamra (`32.75°N, -8.50°W`) | **Demand** | Crop canopy growth dynamics in hyper-arid summer conditions to identify active irrigation. |
+**NABD (*"Pulse"* — نبض)** leverages **NISAR L-band SAR (~24 cm wavelength)** to pierce through smoke, ash, clouds, and darkness to reveal:
+- **Where the fire struck:** Accurate pixel-level burn scars and consolidated fire perimeters.
+- **Severity levels:** Quantitative assessment of canopy and branch destruction via cross-polarization drop ($\Delta\gamma^0_{\text{HV}}$ in dB).
+- **Temporal Progression:** Tracking front propagation and active burn evolution across satellite passes.
+- **Ecosystem Recovery ("The Forest Pulse"):** Differential multi-temporal tracking comparing burned scars against intact control forests.
 
-In addition to visual Earth observation, NABD introduces an innovative **Data Sonification mode ("Écouter la Terre")**, translating radar backscatter time series into traditional Moroccan musical scales (Hijaz mode & Darbouka rhythm).
+### Monitored Wildfire Sites (July–August 2026)
+
+| Target Zone | Country | Ignition / Contained Dates | Official Reported Damage | NISAR GCOV Granules |
+| :--- | :---: | :---: | :--- | :--- |
+| **Ávila – Burgohondo** | 🇪🇸 Spain | 22 Jul → 06 Aug 2026 | $\approx 50,000\text{ ha}$ (up to $77,000\text{ ha}$ with Madrid/Toledo) | 42 provisional + 3 validated (since Jan 2026) |
+| **Gironde – Saumos / Le Porge** | 🇫🇷 France | 22 Jul → 02 Aug 2026 | $42,000\text{ ha}$ (Gironde Prefecture) | 49 provisional + 3 validated (since Nov 2025) |
+| **Laânoussar – Sefrou** | 🇲🇦 Morocco | 31 Jul → 07 Aug 2026 | $480\text{ ha}$ (National Water & Forests Agency - ANEF) | $\approx 85$ provisional + 9 validated (since Jun 2026) |
 
 ---
 
 ## 🗺️ System Architecture & Workflow Diagrams
 
-### End-to-End Data Pipeline Architecture
+### End-to-End Pipeline Workflow
 
 ```mermaid
 flowchart TD
-    subgraph Data_Acquisition["1. Satellite & Catalog Acquisition"]
-        A1["NASA CMR Catalog API"] -->|01_search.py| B1["granules_zone.csv"]
-        B1 -->|02_download.py| C1["NASA Harmony Subset / HDF5 Stream"]
-        C1 --> D1[("Raw GeoTIFF / HDF5 Granules")]
+    subgraph S1["1. Satellite Discovery & Targeted Acquisition"]
+        A["NASA CMR API (ASF DAAC)"] -->|01_search.py| B["granules_zone.csv"]
+        B -->|02_download.py| C["NASA Harmony Spatial Subsetting / HDF5 Stream"]
+        C --> D[("Local Raw GeoTIFF / HDF5 Granules")]
     end
 
-    subgraph Analytics_Engine["2. SAR Processing & Scientific Analytics"]
-        D1 --> E1["Standardized UTM Reprojection"]
-        E1 --> E2["5x5 Lee Speckle Filter & dB Conversion"]
-
-        E2 --> F1["Reservoir Processing (03_lake.py)"]
-        F1 --> G1["Adaptive Dual Otsu Thresholding (HV & HH)"]
-        G1 --> H1["Morphology & Lake Polygon Filtering"]
-        H1 --> I1["Lake Extent Time Series & Occurrence Maps"]
-
-        E2 --> F2["Agricultural Plain Processing (04_fields.py)"]
-        F2 --> G2["Single-Orbit Multi-Temporal Stacking"]
-        G2 --> H2["Growth Dynamic Metrics (P90 - P10)"]
-        H2 --> I2["5-Class Land Cover & Irrigation Phenology"]
+    subgraph S2["2. SAR Processing & Burn Physics (03_fire.py)"]
+        D --> E["Frame Mosaicking & UTM Grid Alignment (EPSG:32630)"]
+        E --> F["5x5 Lee Speckle Filter & dB Conversion (HH & HV)"]
+        F --> G["Scene Baseline Normalization (Unburned Reference Shield)"]
+        G --> H["Multi-Temporal Median Delta: ΔHV = Post(10-120d) - Pre(0-75d)"]
+        H --> I["Multi-Orbit Track Fusion & Gaussian Smoothing (45m)"]
+        I --> J["Spatial Clustering & Connectivity Analysis (Ignition Anchor)"]
     end
 
-    subgraph Synthesis_Web["3. Basin Accounting & Web Presentation"]
-        I1 --> J["05_export.py Aggregator"]
-        I2 --> J
-        K[("official_fill.csv Ground Truth")] --> J
-        J --> L[("web/data/data.js")]
-        L --> M["Interactive Leaflet Map"]
-        L --> N["Time-Series Charts (Chart.js)"]
-        L --> O["Water Balance Accounting Card"]
-        L --> P["Web Audio Sonification ('Écouter la Terre')"]
+    subgraph S3["3. Scientific Products & Visual Presentation"]
+        J --> K1["Burn Scar Perimeter & Severity Matrix"]
+        J --> K2["Fire Progression Timeline"]
+        J --> K3["Recovery Pulse Curve (Scar vs. Control Forest)"]
+        K1 & K2 & K3 --> L["04_export.py"]
+        L --> M[("web/data/data.js")]
+        M --> N["3D Interactive Web Experience (Three.js & Leaflet)"]
+        M --> O["Audio Sonification ('Écouter la Terre')"]
     end
 
-    style Data_Acquisition fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style Analytics_Engine fill:#0f172a,stroke:#10b981,stroke-width:2px,color:#fff
-    style Synthesis_Web fill:#18181b,stroke:#f59e0b,stroke-width:2px,color:#fff
+    style S1 fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style S2 fill:#0f172a,stroke:#ef4444,stroke-width:2px,color:#fff
+    style S3 fill:#18181b,stroke:#10b981,stroke-width:2px,color:#fff
 ```
 
-### Reservoir Water Extraction Pipeline (Al Massira)
-
-```mermaid
-flowchart LR
-    InSAR["NISAR L2 GCOV (HH/HV)"] --> Reproj["Grid Align (EPSG:32629)"]
-    Reproj --> Speckle["Lee Filter (5x5)"]
-    Speckle --> Log["dB Conversion"]
-    Log --> Otsu["Dual Otsu Thresholding<br/>(HV & HH)"]
-    Otsu --> Morph["Morphological Clean<br/>(Opening + Size Filter >= 25px)"]
-    Morph --> Contig["Lake Filter (>= 0.25 km²)"]
-    Contig --> Metric["Lake Area (km²) & WebP Mask"]
-
-    style InSAR fill:#1e293b,stroke:#38bdf8,stroke-width:2px,color:#fff
-    style Otsu fill:#1e3a5f,stroke:#38bdf8,stroke-width:2px,color:#fff
-    style Metric fill:#064e3b,stroke:#34d399,stroke-width:2px,color:#fff
-```
-
-### Agricultural Parcel Phenology & Irrigation Classifier (Doukkala)
+### Burn Scar & Severity Decision Tree
 
 ```mermaid
 flowchart TD
-    TS["Multi-Temporal Radar Cube (Track-specific)"] --> Stats["Calculate Temporal Statistics<br/>(Mean, Std, P10, P90)"]
+    Pix["Pixel Analysis (Pre vs. Post Fire)"] --> PreCheck{"Pre-Fire HV > -22 dB?<br/>(Must be vegetated forest/canopy)"}
+    PreCheck -- No --> NonVeg["Excluded (Bare ground, Water, Rock)"]
+    PreCheck -- Yes --> DropCheck{"ΔHV < -1.0 dB?<br/>(Significant canopy backscatter drop)"}
     
-    Stats --> Q1{"Is (P90 - P10) >= 4.5 dB<br/>AND P90 >= -18.5 dB?"}
-    Q1 -- Yes --> C4["Active Irrigated Crop<br/>(Canopy growth during dry summer)"]
-    Q1 -- No --> Q2{"Is Mean HH >= -4 dB?"}
+    DropCheck -- No --> Intact["Intact Forest / Minimal Damage"]
+    DropCheck -- Yes --> Cluster{"Connected to Ignition Point?<br/>(Path search with zone link threshold)"}
     
-    Q2 -- Yes --> C2["Urban / Built-up<br/>(Double-bounce corner scattering)"]
-    Q2 -- No --> Q3{"Is Mean HV >= -15.5 dB<br/>AND Std HV <= 1.2 dB?"}
-    
-    Q3 -- Yes --> C3["Orchard / Tree Canopy<br/>(Permanent dense volume scattering)"]
-    Q3 -- No --> Q4{"Is Mean HV <= -24 dB<br/>AND Mean HH <= -16 dB?"}
-    
-    Q4 -- Yes --> C1["Open Water Body<br/>(Specular reflection)"]
-    Q4 -- No --> C5["Bare Soil / Fallow"]
+    Cluster -- No --> ExcludePatch["External Change (Clear-cut / Agriculture)"]
+    Cluster -- Yes --> Burned["Burned Core Detected"]
 
-    style C4 fill:#365314,stroke:#a3e635,stroke-width:2px,color:#fff
-    style C1 fill:#1e3a8a,stroke:#60a5fa,stroke-width:2px,color:#fff
-    style C3 fill:#064e3b,stroke:#34d399,stroke-width:2px,color:#fff
-    style C2 fill:#374151,stroke:#9ca3af,stroke-width:2px,color:#fff
-    style C5 fill:#451a03,stroke:#d97706,stroke-width:2px,color:#fff
+    Burned --> Severity{"Severity Breakdown (dB drop)"}
+    Severity -->|"-1.0 dB to -2.5 dB"| SevLow["Low Severity (Yellow)"]
+    Severity -->|"-2.5 dB to -4.0 dB"| SevMod["Moderate Severity (Orange)"]
+    Severity -->|"ΔHV < -4.0 dB"| SevHigh["High Severity (Deep Crimson)"]
+
+    style Burned fill:#7f1d1d,stroke:#f87171,stroke-width:2px,color:#fff
+    style SevLow fill:#713f12,stroke:#fde047,stroke-width:2px,color:#fff
+    style SevMod fill:#7c2d12,stroke:#fb923c,stroke-width:2px,color:#fff
+    style SevHigh fill:#4c0519,stroke:#e11d48,stroke-width:2px,color:#fff
+```
+
+### Fire Progression & Forest Pulse Sonification
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Sat as NISAR Satellite (12-day Orbit)
+    participant Pipe as NABD Pipeline (03_fire.py)
+    participant UI as Interactive 3D / Web Map
+    participant Audio as Web Audio Synth
+
+    Note over Sat,Pipe: Time Series Passes (June -> November 2026)
+    Sat->>Pipe: Transmit L-band GCOV (HH & HV)
+    Pipe->>Pipe: Detect first pass where ΔHV drops > 1.5 dB (Progression Date)
+    Pipe->>Pipe: Compute Pulse: mean(Scar HV) - mean(Control Forest HV)
+    Pipe->>UI: Export GeoTIFF, WebP Overlays & GeoJSON Metrics
+    UI->>Audio: Click Map Pixel -> Synthesize Backscatter Curve into Pitch / Rhythm
+    Note over Audio: Frequency mapped to dB, Darbouka rhythm modulated by signal drop
 ```
 
 ---
 
-## 🛰️ Theoretical Background & Scientific Methods
+## 🔬 Scientific Methodology
 
-NISAR (NASA-ISRO Synthetic Aperture Radar) operates in the **L-band (~24 cm wavelength)**, which penetrates dry soil, clouds, weather cover, and dense vegetation canopies more effectively than shorter optical or C-band wavelengths. NABD processes **NISAR Level-2 GCOV (Geocoded Polarimetric Covariance)** data (`HH` and `HV` polarization backscatter).
+### 1. Radar Physics of Forest Fires in L-Band
+* **Volume Scattering Collapse:** In healthy forests, L-band radar waves (~24 cm) penetrate the foliage and scatter within the dense network of branches and trunks, producing high cross-polarization backscatter ($\gamma^0_{\text{HV}}$). When a fire consumes the canopy, needles fall, and wood loses moisture, volume scattering collapses dramatically, producing a multi-decibel drop.
+* **Delayed Phenological Drop (The 10–120 Day Post-Fire Window):** Real NISAR observations demonstrate that the HV backscatter drop deepens for 2 to 3 months following fire containment as damaged needles desiccate and fall. Immediate post-fire observation drastically underestimates damage. NABD compares the median of acquisitions up to 75 days before against the median of 10 to 120 days post-fire:
+  $$\Delta\gamma^0_{\text{HV}} = \text{median}\left(\gamma^0_{\text{HV, post}}\right) - \text{median}\left(\gamma^0_{\text{HV, pre}}\right)$$
 
-### 1. Water Surface Detection (Reservoir Supply)
-* **Pre-processing:** Reprojection to a standardized metric UTM grid (`EPSG:32629`, 20 m resolution) and Lee Speckle Filtering ($5 \times 5$ window) to suppress SAR granular speckle noise.
-* **Conversion to dB:** Linear power $\gamma^0$ converted via:
-  $$\gamma^0_{\text{dB}} = 10 \cdot \log_{10}(\gamma^0)$$
-* **Adaptive Dual-Polarization Otsu Thresholding:**
-  Water acts as a specular reflector (smooth surface reflecting radar signals away from satellite sensors), resulting in low backscatter:
-  $$\text{Water} = \left( \gamma^0_{\text{HV}} < T_{\text{HV}} \land \gamma^0_{\text{HH}} < T_{\text{HH}} \right) \lor \left( \gamma^0_{\text{HV}} < T_{\text{HV}} - 4\,\text{dB} \right)$$
-  *Automatic threshold boundaries:* $T_{\text{HV}} \in [-32, -18]\,\text{dB}$ and $T_{\text{HH}} \in [-26, -12]\,\text{dB}$.
-* **Morphological Cleaning & Filtering:** Binary opening followed by small hole/object suppression ($<25$ pixels / $1\text{ ha}$) and contiguous water body filtering ($>0.25\text{ km}^2$).
-* **Water Occurrence & Dynamics:** Multi-temporal tracking reveals baseline water reserves vs. seasonal shoreline recession.
+### 2. Scene Calibration & Orbit Averaging
+* **Unburned Reference Calibration:** Rain events or atmospheric moisture can artificially surge backscatter by $+2\text{ dB}$. Every single pass is inter-calibrated against invariant, unburned sections of the scene. Granules displaying calibration deviations $> 3\text{ dB}$ are automatically discarded.
+* **Multi-Geometry Fusion:** Observations from multiple ascending and descending tracks are normalized and averaged, eliminating single-look geometric shadow or layover distortions.
 
-### 2. Crop Growth & Irrigation Mapping (Agricultural Demand)
-* **Single-Orbit Invariant Geometry:** All time-series observations are constrained to single orbital tracks (e.g., Track `044`) to eliminate incidence angle variations.
-* **Summer Growth Inversion:** Summer in Doukkala is dry and cloud-free with near-zero precipitation. Any systematic rise in cross-polarization backscatter ($\gamma^0_{\text{HV}}$) signifies volume scattering from developing plant stems and foliage—providing clear evidence of irrigation:
-  $$\Delta \gamma^0_{\text{HV}} = P_{90}(\gamma^0_{\text{HV}}) - P_{10}(\gamma^0_{\text{HV}}) \ge 4.5\,\text{dB} \quad \text{and} \quad P_{90} \ge -18.5\,\text{dB}$$
-* **Multi-Class Land Surface Classification:**
-  1. **Water:** Mean $\gamma^0_{\text{HV}} \le -24\,\text{dB}$ and $\gamma^0_{\text{HH}} \le -16\,\text{dB}$.
-  2. **Urban / Built-up:** High double-bounce corner reflection (Mean $\gamma^0_{\text{HH}} \ge -4\,\text{dB}$).
-  3. **Perennial Trees / Orchards:** Constant high volume scattering ($\mu_{\text{HV}} \ge -15.5\,\text{dB}$ with $\sigma_{\text{HV}} \le 1.2\,\text{dB}$).
-  4. **Active Summer Crops (Irrigated):** Dynamic backscatter swing exceeding vegetative growth thresholds.
-  5. **Bare Soil / Fallow:** Low backscatter variations throughout the season.
+### 3. Spatial Connectivity & Perimeter Consolidation
+* **Clustering from Ignition:** To prevent false positives caused by seasonal harvesting or clear-cuts, NABD anchors analysis at verified ignition coordinates (`ignition`), capturing the primary scar and linking surrounding spot fires within a spatial link radius (`link_m`: 500 m to 2.5 km).
+* **Official Perimeter Morphological Closing:** Gaps and unburned pockets smaller than 200 m inside the fire zone are closed to reconstruct the official operational perimeter reported by civil protection agencies.
 
-### 3. Integrated Basin Water Balance
-Correlating satellite-measured water surface contraction ($\Delta A_{\text{lake}}$) with official dam volume discharge records ($\Delta V_{\text{official}}$ in $\text{Mm}^3$) and active irrigated acreage ($\text{km}^2$), offering policymakers a transparent water budget accounting framework.
+### 4. Forest Recovery Pulse
+* By continuously tracking:
+  $$\text{Pulse}(t) = \overline{\gamma^0_{\text{HV, scar}}}(t) - \overline{\gamma^0_{\text{HV, control}}}(t)$$
+  NABD eliminates seasonal phenological cycles and sensor re-calibrations, directly charting biological vegetation regrowth over months and years.
 
 ---
 
-## 🗂️ Project Repository Structure
+## 📁 Repository Structure
 
 ```text
 nisar-surface-change/
 ├── data/
-│   ├── granules_massira.csv    # CMR query catalog entries for Al Massira
-│   ├── granules_doukkala.csv   # CMR query catalog entries for Doukkala
-│   ├── official_fill.csv       # Ground truth dam reservoir fill rates & volumes
-│   ├── raw/                    # Downloaded / clipped GeoTIFF radar granules
-│   └── work/                   # Intermediate analytical cubes and JSON outputs
+│   ├── facts.json              # Validated fire stats, casualties, response metadata
+│   ├── inventory.json          # Spatial catalog bounds & acquisition summaries
+│   ├── granules_*.csv          # NASA CMR search granules for Ávila, Gironde & Sefrou
+│   ├── raw/                    # Downloaded GeoTIFFs & NISAR HDF5 datasets
+│   └── work/                   # Analytical GeoTIFF outputs (dHV_dB.tif, severity.tif)
 ├── scripts/
-│   ├── config.py               # Coordinates, bounding boxes, thresholds & parameters
-│   ├── common.py               # Projections, speckle filters (Lee), display encoders
-│   ├── 00_make_demo.py         # Synthetic SAR scene generator for off-line evaluation
-│   ├── 01_search.py            # NASA CMR API discovery client for NISAR scenes
-│   ├── 02_download.py          # NASA Harmony bounding-box subsetter / HDF5 streamer
-│   ├── 03_lake.py              # Surface water extraction pipeline (Otsu + morphology)
-│   ├── 04_fields.py            # Temporal variance analysis for crop classification
-│   └── 05_export.py            # Aggregator compiling outputs into web/data/data.js
+│   ├── config.py               # Fire ignition coordinates, spatial bounds, dB thresholds
+│   ├── common.py               # Radar reprojection, Lee filtering, display composers
+│   ├── 00_make_demo.py         # Synthetic realistic test generator for offline testing
+│   ├── 01_search.py            # NASA CMR API client for NISAR scenes
+│   ├── 02_download.py          # NASA Harmony bounding box downloader / HDF5 streaming
+│   ├── 03_fire.py              # Burn scar, severity, progression & pulse engine
+│   └── 04_export.py            # Packaging artifacts into web/data/data.js
 ├── web/
-│   ├── index.html              # Interactive Dashboard (Leaflet + Chart.js + Web Audio)
-│   ├── data/                   # Packaged dataset & raster overlays (WebP/PNG)
-│   └── vendor/                 # Leaflet GIS vendor styles & scripts
-├── app_demo.py                 # Streamlit exploration prototype
+│   ├── index.html              # Main Interactive Application (Leaflet, WebGL, Web Audio)
+│   ├── intro/                  # 3D interactive prologue globe and textures
+│   ├── data/                   # Packaged map layers (WebP) & data.js
+│   └── vendor/                 # Three.js, Leaflet, and web dependencies
 ├── requirements.txt            # Python dependencies
-└── RESSOURCES.md               # NASA Space Apps resource survey & documentation
+└── README.md                   # Project documentation
 ```
 
 ---
 
-## 🚀 Getting Started
+## ⚡ Quickstart Guide
 
-### 1. Prerequisites & Environment Setup
-Clone the repository and configure your Python virtual environment:
-
+### 1. Environment Setup
 ```bash
 # Clone the repository
 git clone https://github.com/your-username/nisar-surface-change.git
 cd nisar-surface-change
 
-# Set up virtual environment
+# Create and activate virtual environment
 python -m venv .venv
 
-# Activate environment
 # On Linux / macOS:
 source .venv/bin/activate
 # On Windows:
 .venv\Scripts\activate
 
-# Install required dependencies
+# Install dependencies
 pip install -r requirements.txt
 ```
 
-### 2. NASA Earthdata Credentials
-Accessing raw NISAR granules requires an approved [NASA Earthdata Login](https://urs.earthdata.nasa.gov/users/new).
-
-Create or update your `~/.netrc` (or `%USERPROFILE%\_netrc` on Windows):
+### 2. Earthdata Authentication
+Accessing raw NISAR granules requires an approved [NASA Earthdata Login](https://urs.earthdata.nasa.gov/users/new).  
+Save your credentials into `%USERPROFILE%\_netrc` (Windows) or `~/.netrc` (Linux/macOS):
 ```text
 machine urs.earthdata.nasa.gov login <YOUR_USERNAME> password <YOUR_PASSWORD>
 ```
-*(This credential file is strictly personal and excluded via `.gitignore`.)*
 
----
-
-## ⚙️ Running the Full End-to-End Pipeline
+### 3. Pipeline Execution
 
 ```bash
-# Step 0: (Optional) Generate mock synthetic radar data to test offline
+# Step 0: (Optional) Generate synthetic data for offline dry-runs
 python scripts/00_make_demo.py
 
-# Step 1: Query NASA CMR catalog for available NISAR granules
-python scripts/01_search.py --zone massira
-python scripts/01_search.py --zone doukkala
+# Step 1: Query NASA CMR catalog across all zones
+python scripts/01_search.py --zone all
 
-# Step 2: Download clipped spatial bounding boxes (spatially subset via NASA Harmony)
-python scripts/02_download.py --zone massira
-python scripts/02_download.py --zone doukkala --track 044
+# Step 2: Download clipped bounding-box subsets (saves bandwidth vs 6GB full granules)
+python scripts/02_download.py --zone sefrou --limit 2    # Quick test
+python scripts/02_download.py --zone all                 # Full dataset
 
-# Step 3: Extract reservoir water extent & compute surface timeseries
-python scripts/03_lake.py --zone massira
+# Step 3: Run the fire analytical pipeline (burn scar, severity, progression, pulse)
+python scripts/03_fire.py --zone all
 
-# Step 4: Classify irrigated agriculture & crop calendars
-python scripts/04_fields.py --zone doukkala
+# Step 4: Export web datasets and raster layers
+python scripts/04_export.py
 
-# Step 5: Package metrics and layers for the web UI
-python scripts/05_export.py
+# Step 5: Start the web dashboard
+python -m http.server 8000 -d web
 ```
+Navigate to **`http://localhost:8000`** in your browser.
 
 ---
 
-## 🌐 Web Visualization & Interactive Exploration
+## 📊 Scientific Disclaimers & Known Limitations
 
-Launch the local web server to explore the application:
-
-```bash
-python -m http.server -d web 8000
-```
-Open your browser at **`http://localhost:8000`**.
-
-### Dashboard Features:
-* **Interactive Spatio-Temporal Maps:** Switch seamlessly between Al Massira lake contours and Doukkala agricultural parcels.
-* **Dual Layer Overlay:** Inspect calibrated radar amplitude (false color `HH`/`HV`) and automated classification masks.
-* **Time-Series Charts:** Track water surface area fluctuations juxtaposed with official dam telemetry.
-* **Audio Sonification ("Écouter la Terre"):** Click anywhere on the map to sonify the local SAR backscatter signature into microtonal musical rhythms.
+1. **Provisional Calibration Releases:** Datasets acquired prior to October 21, 2026 are NISAR provisional evaluation products undergoing orbital refinement.
+2. **Instrument Coverage Gaps:** A scheduled instrument gap occurred between July 27 and August 10, 2026. Combining multiple overlapping orbital tracks mitigates this gap.
+3. **Topographic Distortion:** In steep mountainous terrain (such as the Middle Atlas in Sefrou or Sierra de Gredos in Ávila), radar layover and shadow can influence backscatter.
+4. **Shrub & Understory vs. High Canopy:** In Ávila, significant portions burned through sparse scrubland and montane grasslands, which exhibit a lower L-band response than dense pine canopies. The radar captures ~60% of scrubland extent while capturing 92%–109% of dense pine and cedar forests in Gironde and Sefrou.
 
 ---
 
-## ⚖️ Scientific Considerations & Disclaimers
-
-1. **Provisional NISAR Data:** Data products correspond to early provisional calibration releases (mid-to-late 2026).
-2. **Wind Roughness Effects on Water:** High surface wind can increase SAR surface roughness and backscatter on water. NABD prioritizes `HV` polarization, which maintains superior contrast against wind-roughened open water.
-3. **Indirect Irrigation Proxy:** Summer active vegetative growth strongly implies irrigation during dry Mediterranean summers, serving as an operational proxy rather than a direct meter reading.
-4. **Water Budget Approximations:** Surface area-to-volume approximations omit localized evaporation dynamics, inter-basin transfers, and municipal drinking water abstractions.
-
----
-
-## 📜 License & Acknowledgments
-Developed for the **NASA Space Apps Challenge 2026**.  
-Satellite data courtesy of **NASA / ISRO** distributed via **ASF DAAC**. Built using open-source geospatial tools: Rasterio, Scikit-Image, SciPy, Leaflet, and Chart.js.
+## 📜 Credits & License
+Developed for the **NASA Space Apps Challenge 2026** under track *Dancing with the SARs*.  
+NISAR data products provided by **NASA / ISRO** through the **Alaska Satellite Facility (ASF) DAAC**.
