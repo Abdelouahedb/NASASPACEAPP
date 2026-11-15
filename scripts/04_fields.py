@@ -24,7 +24,7 @@ import config as C
 from common import Grid, db, encode_cube, lee_filter, radar_rgba, save_rgba, scenes
 
 CLASSES = {
-    1: ("water", "Eau", (37, 99, 235)),
+    1: ("water", "Eau libre", (37, 99, 235)),
     2: ("urban", "Bâti / villages", (226, 232, 240)),
     3: ("trees", "Arbres / vergers", (21, 128, 61)),
     4: ("crop", "Culture active (irriguée)", (163, 230, 53)),
@@ -51,7 +51,8 @@ def classify(hh, hv):
     cls[crop] = 4
     cls[valid & (mhv >= r["tree_hv_min"]) & (shv <= r["tree_std_max"])] = 3
     cls[valid & (mhh >= r["urban_hh_min"])] = 2
-    cls[valid & (mhv <= r["water_hv_max"]) & (mhh <= -16)] = 1
+    # open water: very dark in BOTH polarisations (smooth dry soil is dark in HV but brighter in HH)
+    cls[valid & (mhv <= r["water_hv_max"]) & (mhh <= r["water_hh_max"])] = 1
     return cls
 
 
@@ -85,6 +86,9 @@ def main():
         records.append({**info, "key": key, "radar": f"data/layers/{zone}/radar_{key}.webp"})
     hh_s, hv_s = np.stack(hh_s), np.stack(hv_s)
 
+    # keep the filtered radar stack for 06_fetch_hls.py / 07_validate.py
+    np.savez_compressed(paths["work"] / "stack.npz", hh=hh_s.astype("float32"), hv=hv_s.astype("float32"),
+                        dates=np.array([r["date"] for r in records]), keys=np.array([r["key"] for r in records]))
     cls = classify(hh_s, hv_s)
     if not cls.any():
         raise SystemExit("No pixels have coverage across all field acquisitions")
