@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NABD — L'été de feu</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&family=Reem+Kufi:wght@600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="vendor/leaflet.css">
+<style>
+:root {
+  /* Layout: one "night after the fire" world. Site cards -> map + control rail -> evidence (pulse, areas, data). */
+  --ink: #0d0f14;
+  --panel: #151922;
+  --panel-2: #1c2230;
+  --line: #2a3142;
+  --text: #ece8e1;
+  --muted: #9aa0ad;
+  --ember: #f97316;        /* accent: fire */
+  --ash: #cbd5e1;
+  --forest: #a3e635;       /* data: living forest */
+  --water: #38bdf8;
+  --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  --arabic: "Reem Kufi", "Noto Kufi Arabic", "Segoe UI", sans-serif;
+  --r: 10px;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--ink); color: var(--text); font: 15px/1.55 var(--body); }
+a { color: var(--ember); }
+:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; letter-spacing: -0.01em; }
+.wrap { max-width: 1340px; margin: 0 auto; padding: 0 20px; }
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.muted { color: var(--muted); }
+
+header { border-bottom: 1px solid var(--line); }
+.top { display: flex; align-items: center; gap: 16px; padding: 14px 0; flex-wrap: wrap; }
+.brand { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.brand h1 { font-size: 28px; font-weight: 800; }
+.brand .ar { font-family: var(--arabic); font-size: 26px; color: var(--ember); }
+.brand .tag { color: var(--muted); font-size: 14px; }
+.spacer { flex: 1; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+.seg button { background: none; border: 0; color: var(--muted); padding: 6px 12px; font: 600 13px var(--body); cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--panel-2); color: var(--text); }
+.demo { background: #3a220b; border: 1px solid #8a4b12; color: #fed7aa; padding: 8px 14px; border-radius: var(--r); font-size: 13.5px; margin: 12px 0 0; }
+
+.intro { display: grid; grid-template-columns: 1fr 1.25fr; gap: 28px; padding: 24px 0 18px; align-items: start; }
+.intro h2 { font-size: 32px; line-height: 1.12; margin-bottom: 10px; }
+.intro p { margin: 0 0 10px; max-width: 62ch; color: #d8d4cc; }
+.inv { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 12px; }
+.inv div { font-size: 12.5px; color: var(--muted); }
+.inv b { display: block; font: 600 22px var(--mono); color: var(--text); }
+.sites { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.site { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px; cursor: pointer; text-align: left; color: var(--text); font: inherit; display: flex; flex-direction: column; gap: 4px; }
+.site[aria-pressed="true"] { border-color: var(--ember); box-shadow: inset 0 3px 0 var(--ember); }
+.site .flag { font-size: 12px; color: var(--muted); letter-spacing: .04em; }
+.site .nm { font: 700 16px var(--display); }
+.site .big { font: 600 24px var(--mono); }
+.site .big small { font-size: 13px; color: var(--muted); font-weight: 400; }
+.site .vs { font-size: 12.5px; color: var(--muted); }
+.meter { height: 6px; background: var(--panel-2); border-radius: 3px; overflow: hidden; margin-top: 4px; }
+.meter i { display: block; height: 100%; background: var(--ember); }
+
+.stage { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 14px; }
+.mapbox { position: relative; }
+#map { height: 620px; border-radius: var(--r); border: 1px solid var(--line); background: #10141c; }
+.leaflet-container { font: 13px var(--body); }
+.leaflet-control-attribution { background: rgba(13,15,20,.75) !important; color: var(--muted) !important; }
+.leaflet-control-attribution a { color: var(--muted) !important; }
+.leaflet-bar a { background: var(--panel-2); color: var(--text); border-color: var(--line); }
+.leaflet-tooltip.tip { background: var(--panel); color: var(--text); border: 1px solid var(--line); box-shadow: none; }
+#swipe { position: absolute; top: 0; bottom: 0; width: 0; border-left: 2px solid #fff; z-index: 500; display: none; pointer-events: none; }
+#swipe span { position: absolute; top: 50%; left: -16px; width: 32px; height: 32px; margin-top: -16px; border-radius: 50%; background: #fff; color: #111; display: grid; place-items: center; font-weight: 700; pointer-events: auto; cursor: ew-resize; }
+.swipe-labels { position: absolute; top: 10px; left: 56px; right: 10px; z-index: 500; display: none; justify-content: space-between; pointer-events: none; }
+.swipe-labels b { background: rgba(13,15,20,.8); padding: 3px 8px; border-radius: 6px; font-size: 12.5px; }
+
+.rail { display: flex; flex-direction: column; gap: 12px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 14px; }
+.card h3 { font-size: 15px; margin-bottom: 8px; }
+.time { display: flex; align-items: center; gap: 10px; }
+.play { width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--ember); background: none; color: var(--ember); cursor: pointer; font-size: 15px; flex: none; }
+.play:hover { background: rgba(249,115,22,.12); }
+input[type=range] { width: 100%; accent-color: var(--ember); }
+.date-line { display: flex; justify-content: space-between; align-items: baseline; margin-top: 6px; gap: 8px; flex-wrap: wrap; }
+.date-line .d { font: 600 18px var(--mono); }
+.chip { display: inline-block; font-size: 11.5px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+.chip.before { border-color: #4d7c0f; color: #bef264; }
+.chip.during { border-color: var(--ember); color: #fdba74; background: rgba(249,115,22,.12); }
+.chip.after { border-color: #9f1239; color: #fda4af; }
+.stat { display: flex; justify-content: space-between; padding: 6px 0; border-top: 1px dashed var(--line); font-size: 14px; gap: 10px; }
+.stat:first-of-type { border-top: 0; }
+.stat b { font: 600 15px var(--mono); white-space: nowrap; }
+.toggles { display: flex; flex-wrap: wrap; gap: 6px; }
+.toggles label { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; padding: 5px 10px; border: 1px solid var(--line); border-radius: 999px; cursor: pointer; background: var(--panel-2); }
+.toggles input { accent-color: var(--ember); margin: 0; }
+.legend { display: grid; gap: 4px; margin-top: 10px; font-size: 12.5px; }
+.legend div { display: flex; align-items: center; gap: 8px; }
+.sw { width: 14px; height: 14px; border-radius: 3px; flex: none; border: 1px solid rgba(255,255,255,.15); }
+.ramp { height: 10px; border-radius: 3px; flex: 1; }
+.listen canvas { width: 100%; height: 76px; display: block; background: var(--panel-2); border-radius: 6px; margin: 8px 0; }
+.btn { background: var(--ember); color: #1b0d03; border: 0; border-radius: 8px; padding: 8px 12px; font: 600 13.5px var(--body); cursor: pointer; }
+.btn.ghost { background: none; color: var(--ember); border: 1px solid var(--ember); }
+.btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+section.block { padding: 34px 0 6px; }
+section.block > h2 { font-size: 24px; margin-bottom: 6px; }
+section.block > p.lead { color: #d8d4cc; max-width: 72ch; margin: 0 0 16px; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.chart-box { position: relative; height: 320px; }
+.bars { display: grid; gap: 10px; }
+.bar { display: grid; grid-template-columns: 190px 1fr 120px; gap: 10px; align-items: center; font-size: 13.5px; }
+.bar .track { background: var(--panel-2); border-radius: 4px; height: 12px; overflow: hidden; display: flex; }
+.bar .track i { display: block; height: 100%; }
+.bar .v { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.facts { margin: 0; padding-left: 18px; font-size: 14px; color: #d8d4cc; }
+.facts li { margin-bottom: 4px; }
+.steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; counter-reset: s; }
+.steps .card h3::before { counter-increment: s; content: counter(s) "  "; color: var(--ember); font-family: var(--mono); }
+.steps p { margin: 0; font-size: 13.5px; color: #d8d4cc; }
+table.data { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+table.data th, table.data td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+table.data td.n { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+table.data th { color: var(--muted); font-weight: 500; }
+.tablewrap { overflow-x: auto; }
+footer { border-top: 1px solid var(--line); margin-top: 40px; padding: 20px 0 40px; font-size: 13px; color: var(--muted); }
+footer ul { margin: 6px 0 0; padding-left: 18px; columns: 2; column-gap: 32px; }
+footer li { margin-bottom: 4px; break-inside: avoid; }
+
+@media (max-width: 1050px) {
+  .intro, .stage, .two { grid-template-columns: 1fr; }
+  .steps { grid-template-columns: 1fr 1fr; }
+  #map { height: 480px; }
+  footer ul { columns: 1; }
+}
+@media (max-width: 560px) {
+  .sites { grid-template-columns: 1fr; }
+  .steps { grid-template-columns: 1fr; }
+  .bar { grid-template-columns: 110px 1fr 90px; }
+  .brand h1 { font-size: 24px; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap top">
+    <div class="brand">
+      <h1>NABD</h1><span class="ar" lang="ar">نبض</span>
+      <span class="tag" data-i18n="tagline">L'été de feu 2026 : le pouls des forêts, vu par le radar NISAR</span>
+    </div>
+    <div class="spacer"></div>
+    <div class="seg" role="group" aria-label="Langue / Language">
+      <button id="lang-fr" aria-pressed="true">FR</button>
+      <button id="lang-en" aria-pressed="false">EN</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div id="demo-banner" class="demo" hidden data-i18n="demo">Données radar de démonstration (synthétiques) : le pipeline et l'interface sont réels et les dates des passages NISAR sont les vraies. Les cartes se remplissent avec les vraies images dès leur téléchargement. Les chiffres officiels des incendies sont réels.</div>
+
+  <div class="intro">
+    <div>
+      <h2 data-i18n="h_intro">Juillet 2026 : la Méditerranée brûle. Un radar voit à travers la fumée.</h2>
+      <p data-i18n="p_intro1">En dix jours, deux feux records ont dévoré près de 1 000 km² de forêt en Espagne et en France. Au Maroc, le Moyen Atlas a brûlé aussi. Pendant ce temps, NISAR (NASA–ISRO) passait au-dessus tous les 12 jours, de jour comme de nuit.</p>
+      <p data-i18n="p_intro2">Son radar en bande L (24 cm) traverse la fumée et « touche » les branches et les troncs. Quand une forêt brûle, ce signal s'effondre. NABD mesure cette chute pixel par pixel : où le feu est passé, avec quelle violence, et si la forêt repart.</p>
+      <div class="inv" id="inventory"></div>
+    </div>
+    <div class="sites" id="sites" role="group" aria-label="Incendies"></div>
+  </div>
+
+  <div class="stage">
+    <div class="mapbox">
+      <div id="map" role="region" aria-label="Carte radar"></div>
+      <div id="swipe"><span aria-hidden="true">⇆</span></div>
+      <div class="swipe-labels" id="swipe-labels"><b data-i18n="before">Avant le feu</b><b data-i18n="after">Après le feu</b></div>
+    </div>
+    <aside class="rail">
+      <div class="card">
+        <div class="time">
+          <button class="play" id="play" aria-label="Lecture">▶</button>
+          <input type="range" id="slider" min="0" max="0" value="0" aria-label="Passage NISAR">
+        </div>
+        <div class="date-line"><span class="d" id="date">–</span><span id="phase" class="chip"></span></div>
+        <div class="muted" style="font-size:12.5px;margin-top:2px" id="pass"></div>
+        <div id="stats" style="margin-top:8px"></div>
+      </div>
+      <div class="card">
+        <h3 data-i18n="layers">Couches</h3>
+        <div class="toggles" id="toggles"></div>
+        <div class="legend" id="legend"></div>
+      </div>
+      <div class="card listen">
+        <h3 data-i18n="listen_h">Écouter la forêt</h3>
+        <div class="muted" style="font-size:13px" data-i18n="listen_hint">Cliquez sur la carte : la série radar de ce point devient une mélodie. Une forêt intacte garde sa note ; là où le feu passe, la mélodie s'effondre dans un craquement.</div>
+        <canvas id="spark" width="600" height="150" aria-label="Série temporelle du point choisi"></canvas>
+        <div class="btn-row">
+          <button class="btn" id="listen-site" data-i18n="listen_site">Écouter la cicatrice</button>
+          <button class="btn ghost" id="listen-stop" data-i18n="stop">Stop</button>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <section class="block">
+    <h2 data-i18n="h_pulse">Le pouls de la forêt</h2>
+    <p class="lead" data-i18n="p_pulse">Chaque point est un passage de NISAR. La courbe montre le signal HV de la zone brûlée moins celui de la forêt intacte voisine, ce qui annule les effets de saison et d'orbite. Avant le feu, elle reste à plat près de 0. Pendant le feu (bande orange), elle plonge. Après, on voit si la forêt repart.</p>
+    <div class="card"><div class="chart-box"><canvas id="chart-pulse" aria-label="Pouls de la forêt"></canvas></div></div>
+  </section>
+
+  <section class="block">
+    <h2 data-i18n="h_compare">Le radar contre les chiffres officiels</h2>
+    <p class="lead" data-i18n="p_compare">Surface brûlée mesurée automatiquement par NISAR (périmètre de la cicatrice), comparée au bilan des autorités. Chaque barre est en pourcentage du chiffre officiel. Le radar bande L voit surtout le bois : les herbes et les broussailles brûlées changent peu son signal.</p>
+    <div class="two">
+      <div class="card"><h3 data-i18n="area_h">Surface brûlée</h3><div class="bars" id="area-bars"></div></div>
+      <div class="card"><h3 data-i18n="sev_h">Sévérité (chute du signal HV)</h3><div class="bars" id="sev-bars"></div>
+        <p class="muted" style="font-size:12.5px;margin:10px 0 0" data-i18n="sev_note">Faible : −1 à −2,5 dB · Modérée : −2,5 à −4 dB · Forte : plus de −4 dB, soit 2,5 fois moins de signal.</p></div>
+    </div>
+  </section>
+
+  <section class="block">
+    <h2 id="facts-h">–</h2>
+    <div class="two">
+      <div class="card"><ul class="facts" id="facts"></ul></div>
+      <div class="card"><h3 data-i18n="prog_h">Progression vue par NISAR</h3><div class="bars" id="prog-bars"></div>
+        <p class="muted" style="font-size:12.5px;margin:10px 0 0" data-i18n="prog_note">Ce qui apparaissait déjà « éteint » sur un passage pendant le feu, puis le reste, vu au premier passage après le feu. Il n'y a pas d'image NISAR du 27 juillet au 10 août.</p></div>
+    </div>
+  </section>
+
+  <section class="block">
+    <h2 data-i18n="h_method">Comment ça marche</h2>
+    <div class="steps">
+      <div class="card"><h3 data-i18n="s1_h">Données NISAR</h3><p data-i18n="s1">Produit GCOV bande L, HH et HV, corrigé du relief. Seule la fenêtre de chaque feu est découpée côté NASA : quelques Mo au lieu de 6 Go par image. Les cadres voisins d'un même passage sont assemblés.</p></div>
+      <div class="card"><h3 data-i18n="s2_h">Avant / après</h3><p data-i18n="s2">Chaque passage est d'abord calé sur la partie non brûlée de l'image (cela efface les jours de pluie et les sauts d'étalonnage). Pour chaque orbite, ΔHV = médiane des passages de 10 à 120 jours après le feu − médiane des passages des 75 jours d'avant. La chute continue de se creuser pendant des semaines : il faut regarder longtemps après. Les orbites sont moyennées.</p></div>
+      <div class="card"><h3 data-i18n="s3_h">Cicatrice</h3><p data-i18n="s3">Une zone est comptée comme brûlée si elle portait de la végétation (HV > −22 dB) et que son HV lissé chute de plus de 1 dB. On ne garde que les taches reliées au feu (pas les coupes de bois ou les récoltes ailleurs). Le périmètre referme les trous de moins de 200 m, comme les bilans officiels.</p></div>
+      <div class="card"><h3 data-i18n="s4_h">Pouls et vérification</h3><p data-i18n="s4">On suit, passage par passage, la cicatrice comparée à la forêt témoin. Les surfaces sont comparées aux bilans officiels. Les passages qui couvrent moins de 60 % de la zone sont signalés.</p></div>
+    </div>
+  </section>
+
+  <section class="block">
+    <h2 data-i18n="h_data">Les données utilisées et disponibles</h2>
+    <p class="lead" data-i18n="p_data">Toutes viennent du catalogue de la NASA (Earthdata, ASF). Comptage du 14 novembre 2026 : relancez 01_search.py pour le chiffre à jour.</p>
+    <div class="card tablewrap"><table class="data" id="data-table"></table></div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div data-i18n="credits">Projet NASA Space Apps Challenge 2026, défi « Dancing with the SARs ». Code ouvert. Radar : NASA/JPL–ISRO NISAR via ASF DAAC. Fond de carte : Esri.</div>
+    <p id="context" style="max-width:90ch"></p>
+    <div data-i18n="sources_h">Sources des bilans officiels :</div>
+    <ul id="sources"></ul>
+  </div>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="data/data.js"></script>
+<script>
+(function () {
+"use strict";
+const D = window.NABD;
+const ORDER = D.order;
+
+// ---------------------------------------------------------------- i18n
+const EN = {
+  tagline: "Summer of fire 2026: the pulse of forests, seen by the NISAR radar",
+  demo: "Demo radar data (synthetic): the pipeline and the interface are real, and the NISAR pass dates are the real ones. The maps fill with the real images as soon as they are downloaded. Official fire figures are real.",
+  h_intro: "July 2026: the Mediterranean burns. A radar sees through the smoke.",
+  p_intro1: "In ten days, two record fires consumed nearly 1,000 km² of forest in Spain and France. In Morocco, the Middle Atlas burned too. Meanwhile NISAR (NASA–ISRO) flew over every 12 days, day and night.",
+  p_intro2: "Its L-band radar (24 cm) goes through smoke and 'touches' branches and trunks. When a forest burns, that signal collapses. NABD measures the drop pixel by pixel: where the fire went, how violently, and whether the forest comes back.",
+  before: "Before the fire", after: "After the fire", layers: "Layers",
+  listen_h: "Listen to the forest",
+  listen_hint: "Click the map: the radar time series of that spot becomes a melody. Intact forest holds its note; where the fire passes, the melody collapses with a crackle.",
+  listen_site: "Play the scar", stop: "Stop",
+  h_pulse: "The pulse of the forest",
+  p_pulse: "Each dot is one NISAR pass. The curve is the HV signal of the burned area minus that of the nearby intact forest, which cancels season and orbit effects. Before the fire it stays flat near 0. During the fire (orange band) it plunges. Afterwards it shows whether the forest recovers.",
+  h_compare: "Radar versus official figures",
+  p_compare: "Burned area measured automatically by NISAR (scar perimeter), compared with the authorities' figures. Each bar is a percentage of the official figure. L-band radar mostly sees wood: burned grass and scrub barely change its signal.",
+  area_h: "Burned area", sev_h: "Severity (drop of the HV signal)",
+  sev_note: "Low: −1 to −2.5 dB · Moderate: −2.5 to −4 dB · High: more than −4 dB, i.e. 2.5 times less signal.",
+  prog_h: "Spread seen by NISAR",
+  prog_note: "What already looked 'switched off' on a pass during the fire, then the rest, seen on the first pass after it. NISAR has no images from 27 July to 10 August.",
+  h_method: "How it works",
+  s1_h: "NISAR data", s1: "L-band GCOV product, HH and HV, terrain-corrected. Only each fire's window is cut at NASA: a few MB instead of 6 GB per image. Adjacent frames of one pass are mosaicked.",
+  s2_h: "Before / after", s2: "Each pass is first calibrated on the unburned part of the image (this removes rainy days and calibration jumps). For each orbit, ΔHV = median of passes 10 to 120 days after the fire − median of passes in the 75 days before. The drop keeps deepening for weeks, so we look long after. Orbits are averaged.",
+  s3_h: "Scar", s3: "An area counts as burned if it had vegetation (HV > −22 dB) and its smoothed HV drops by more than 1 dB. Only patches connected to the fire are kept (not clear-cuts or harvests elsewhere). The perimeter closes gaps under 200 m, like official figures.",
+  s4_h: "Pulse and checking", s4: "We follow the scar against the control forest, pass by pass. Areas are compared with official figures. Passes covering less than 60% of the zone are flagged.",
+  h_data: "Data used and available",
+  p_data: "All from NASA's catalogue (Earthdata, ASF). Counted on 14 November 2026: re-run 01_search.py for the live figure.",
+  credits: "NASA Space Apps Challenge 2026 project, “Dancing with the SARs” challenge. Open source. Radar: NASA/JPL–ISRO NISAR via ASF DAAC. Basemap: Esri.",
+  sources_h: "Sources for official figures:"
+};
+const FR = {};
+document.querySelectorAll("[data-i18n]").forEach(el => { FR[el.dataset.i18n] = el.textContent; });
+let lang = "fr";
+try { lang = localStorage.getItem("nabd-lang") || "fr"; } catch (e) {}
+const T = {
+  fr: { radar: "Radar du passage", severity: "Sévérité", dhv: "Chute du signal (ΔHV)", progression: "Progression", swipe: "Avant / après",
+        before: "avant", during: "pendant le feu", after: "après", partial: "passage partiel", track: "orbite", asc: "montante", desc: "descendante",
+        frames: "cadre(s)", scar: "Cicatrice − forêt témoin", burned_now: "Déjà « éteint » sur le radar", cover: "Couverture",
+        low: "Faible", moderate: "Modérée", high: "Forte", official: "officiel", radar_w: "radar",
+        contrast: "Cicatrice − forêt témoin (dB)", frac: "Part déjà brûlée (%)", firewin: "Feu actif",
+        dhv_lo: "−8 dB", dhv_hi: "+4 dB", legend_radar: "Rouge = HH, vert = HV (bois), bleu = rapport HH/HV. Forêt : vert-jaune ; brûlé : violet ; eau : noir.",
+        click: "Cliquez sur la carte", outside: "Hors des zones étudiées.", no_data: "Pas de donnée ici.",
+        pt_burn: "le feu est passé ici", others: "autres passages", pt_ok: "forêt intacte", pt_other: "sol nu ou champ",
+        facts_h: n => `Le feu de ${n}`, gcov: "images radar NISAR (GCOV)", gunw: "interférogrammes NISAR", dist: "cartes OPERA de perturbation",
+        product: "Produit", what: "Ce que c'est", ha: "ha", passes: "passages", first: "depuis",
+        edge: "Le feu déborde du cadre analysé : seule la partie à l'intérieur est comptée.",
+        col_site: "Site", col_gcov: "GCOV", col_val: "GCOV validé", col_gunw: "GUNW", col_dist: "OPERA DIST-HLS", col_first: "1re image", col_tracks: "Orbites" },
+  en: { radar: "Pass radar", severity: "Severity", dhv: "Signal drop (ΔHV)", progression: "Spread", swipe: "Before / after",
+        before: "before", during: "during the fire", after: "after", partial: "partial pass", track: "track", asc: "ascending", desc: "descending",
+        frames: "frame(s)", scar: "Scar − control forest", burned_now: "Already 'off' on radar", cover: "Coverage",
+        low: "Low", moderate: "Moderate", high: "High", official: "official", radar_w: "radar",
+        contrast: "Scar − control forest (dB)", frac: "Share already burned (%)", firewin: "Active fire",
+        dhv_lo: "−8 dB", dhv_hi: "+4 dB", legend_radar: "Red = HH, green = HV (wood), blue = HH/HV ratio. Forest: green-yellow; burned: purple; water: black.",
+        click: "Click the map", outside: "Outside the study zones.", no_data: "No data here.",
+        pt_burn: "the fire passed here", others: "other passes", pt_ok: "intact forest", pt_other: "bare soil or field",
+        facts_h: n => `The ${n} fire`, gcov: "NISAR radar images (GCOV)", gunw: "NISAR interferograms", dist: "OPERA disturbance maps",
+        product: "Product", what: "What it is", ha: "ha", passes: "passes", first: "since",
+        edge: "The fire spills over the edge of the analysed frame: only the part inside is counted.",
+        col_site: "Site", col_gcov: "GCOV", col_val: "GCOV validated", col_gunw: "GUNW", col_dist: "OPERA DIST-HLS", col_first: "First image", col_tracks: "Tracks" }
+};
+const t = () => T[lang];
+const loc = () => lang === "fr" ? "fr-FR" : "en-GB";
+const fmtDate = iso => new Date(iso + "T12:00:00Z").toLocaleDateString(loc(), { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+const nf = (v, d = 0) => v == null || !isFinite(v) ? "–" : v.toLocaleString(loc(), { minimumFractionDigits: d, maximumFractionDigits: d });
+const shortName = z => z.name.split("–")[0].trim();
+
+// ---------------------------------------------------------------- map
+const map = L.map("map", { zoomSnap: 0.25, preferCanvas: true });
+const base = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+  { maxZoom: 17, attribution: "Imagery © Esri" }).addTo(map);
+let tOk = 0, tErr = 0;
+base.on("tileload", () => tOk++);
+base.on("tileerror", () => { if (++tErr > 6 && tOk === 0) map.removeLayer(base); });
+
+const LY = {};      // per zone overlays
+for (const k of ORDER) {
+  const z = D.zones[k], last = z.acquisitions.length - 1, ov = (u, o = 1) => L.imageOverlay(u, z.bounds, { opacity: o, interactive: false });
+  LY[k] = { radar: ov(z.acquisitions[last].radar), severity: ov(z.layers.severity), dhv: ov(z.layers.dhv, .9),
+            progression: ov(z.layers.progression), before: ov(z.layers.before), after: ov(z.layers.after) };
+  L.rectangle(z.bounds, { color: "#f97316", weight: 1, dashArray: "4 4", fill: false, interactive: false }).addTo(map);
+  L.circleMarker(z.ignition, { radius: 5, color: "#fff", weight: 2, fillColor: "#f97316", fillOpacity: 1 })
+    .bindTooltip(z.name, { className: "tip", direction: "top" }).addTo(map);
+  z.acquisitions.forEach(a => { const i = new Image(); i.src = a.radar; });
+}
+
+const state = { zone: ORDER[0], idx: {}, on: { radar: true, severity: true, dhv: false, progression: false, swipe: false } };
+ORDER.forEach(k => {
+  const acq = D.zones[k].acquisitions; let i = acq.length - 1;
+  while (i > 0 && acq[i].partial) i--; state.idx[k] = i;
+});
+const Z = () => D.zones[state.zone];
+
+function syncLayers() {
+  for (const k of ORDER) {
+    const active = k === state.zone, sw = state.on.swipe && active;
+    const want = {
+      radar: !sw && state.on.radar, severity: !sw && state.on.severity, dhv: !sw && state.on.dhv,
+      progression: !sw && state.on.progression, before: sw, after: sw
+    };
+    if (!active) { want.radar = state.on.radar; want.severity = state.on.severity; want.dhv = false; want.progression = false; }
+    for (const [name, lyr] of Object.entries(LY[k])) {
+      if (want[name] && !map.hasLayer(lyr)) lyr.addTo(map);
+      if (!want[name] && map.hasLayer(lyr)) map.removeLayer(lyr);
+    }
+    ["radar", "before", "after", "dhv", "progression", "severity"].forEach(n => { if (map.hasLayer(LY[k][n])) LY[k][n].bringToFront(); });
+  }
+  document.getElementById("swipe").style.display = state.on.swipe ? "block" : "none";
+  document.getElementById("swipe-labels").style.display = state.on.swipe ? "flex" : "none";
+  updateSwipe();
+}
+
+// before/after swipe ---------------------------------------------------------------
+let swipeX = null;
+const swipeEl = document.getElementById("swipe");
+function updateSwipe() {
+  const mapEl = document.getElementById("map"), W = mapEl.clientWidth;
+  if (swipeX == null) swipeX = W / 2;
+  swipeX = Math.max(10, Math.min(W - 10, swipeX));
+  swipeEl.style.left = swipeX + "px";
+  const lyr = LY[state.zone] && LY[state.zone].after, el = lyr && lyr.getElement && lyr.getElement();
+  if (!el) return;
+  if (!state.on.swipe) { el.style.clipPath = ""; return; }
+  const r = el.getBoundingClientRect(), m = mapEl.getBoundingClientRect();
+  const cut = Math.max(0, swipeX - (r.left - m.left));
+  el.style.clipPath = `inset(0 0 0 ${cut}px)`;
+}
+map.on("move zoom zoomend moveend", updateSwipe);
+(() => {
+  let drag = false;
+  const handle = swipeEl.querySelector("span");
+  const move = x => { const m = document.getElementById("map").getBoundingClientRect(); swipeX = x - m.left; updateSwipe(); };
+  handle.addEventListener("pointerdown", e => { drag = true; handle.setPointerCapture(e.pointerId); map.dragging.disable(); });
+  handle.addEventListener("pointermove", e => { if (drag) move(e.clientX); });
+  handle.addEventListener("pointerup", () => { drag = false; map.dragging.enable(); });
+})();
+
+// ---------------------------------------------------------------- rail
+const LAYERS = ["radar", "severity", "dhv", "progression", "swipe"];
+function renderToggles() {
+  const box = document.getElementById("toggles"); box.innerHTML = "";
+  for (const name of LAYERS) {
+    const lab = document.createElement("label");
+    lab.innerHTML = `<input type="checkbox" id="tg-${name}" ${state.on[name] ? "checked" : ""}> ${t()[name]}`;
+    lab.querySelector("input").addEventListener("change", e => { state.on[name] = e.target.checked; syncLayers(); renderLegend(); });
+    box.appendChild(lab);
+  }
+}
+function renderLegend() {
+  const S = t(), z = Z(); let h = "";
+  if (state.on.severity && !state.on.swipe) h += `<div><span class="sw" style="background:#fde047"></span>${S.low}</div><div><span class="sw" style="background:#f97316"></span>${S.moderate}</div><div><span class="sw" style="background:#be123c"></span>${S.high}</div>`;
+  if (state.on.dhv && !state.on.swipe) h += `<div>${S.dhv_lo}<span class="ramp" style="background:linear-gradient(90deg,#7f1d1d,#ea580c,#fde68a,#f1f5f9,#38bdf8)"></span>${S.dhv_hi}</div>`;
+  if (state.on.progression && !state.on.swipe) z.progression.forEach(p => { h += `<div><span class="sw" style="background:${p.color}"></span>${p.date ? fmtDate(p.date) : S.others} · ${nf(p.ha)} ha</div>`; });
+  if (state.on.radar || state.on.swipe) h += `<div class="muted">${S.legend_radar}</div>`;
+  document.getElementById("legend").innerHTML = h;
+}
+
+const slider = document.getElementById("slider");
+function setIndex(i) {
+  const z = Z(), S = t();
+  i = Math.max(0, Math.min(z.acquisitions.length - 1, i));
+  state.idx[state.zone] = i; slider.max = z.acquisitions.length - 1; slider.value = i;
+  const a = z.acquisitions[i];
+  LY[state.zone].radar.setUrl(a.radar);
+  document.getElementById("date").textContent = fmtDate(a.date);
+  const ph = document.getElementById("phase");
+  ph.textContent = a.partial ? `${S.partial} · ${Math.round(a.coverage * 100)} %` : S[a.phase];
+  ph.className = "chip " + (a.partial ? "" : a.phase);
+  document.getElementById("pass").textContent = `${S.track} ${a.track} · ${a.direction === "ascending" ? S.asc : S.desc} · ${a.granules.length} ${S.frames} · ${a.time_utc} UTC`;
+  let s = "";
+  s += `<div class="stat"><span>${S.scar}</span><b>${a.contrast == null ? "–" : (a.contrast > 0 ? "+" : "") + nf(a.contrast, 1) + " dB"}</b></div>`;
+  s += `<div class="stat"><span>${S.burned_now}</span><b>${a.burned_frac == null ? "–" : nf(a.burned_frac * 100) + " %"}</b></div>`;
+  s += `<div class="stat"><span>${S.cover}</span><b>${nf(a.coverage * 100)} %</b></div>`;
+  document.getElementById("stats").innerHTML = s;
+  highlight();
+}
+slider.addEventListener("input", e => setIndex(+e.target.value));
+let timer = null;
+const playBtn = document.getElementById("play");
+const stopPlay = () => { clearInterval(timer); timer = null; playBtn.textContent = "▶"; };
+playBtn.addEventListener("click", () => {
+  if (timer) return stopPlay();
+  playBtn.textContent = "❚❚";
+  if (+slider.value >= +slider.max) setIndex(0);
+  timer = setInterval(() => { const i = +slider.value + 1; if (i > +slider.max) return stopPlay(); setIndex(i); }, 650);
+});
+
+function setZone(k, fit = true) {
+  stopPlay(); state.zone = k;
+  document.querySelectorAll(".site").forEach(b => b.setAttribute("aria-pressed", b.dataset.zone === k));
+  if (fit) map.fitBounds(D.zones[k].focus || D.zones[k].bounds, { padding: [8, 8] });
+  syncLayers(); renderToggles(); renderLegend(); setIndex(state.idx[k]); renderZonePanels(); buildPulse();
+}
+
+// ---------------------------------------------------------------- sound
+let ac = null, playing = [];
+const HIJAZ = [0, 1, 4, 5, 7, 8, 10];
+function audio() { if (!ac) { const A = window.AudioContext || window.webkitAudioContext; if (A) ac = new A(); } if (ac && ac.state === "suspended") ac.resume(); return ac; }
+function stopSound() { playing.forEach(n => { try { n.stop(); } catch (e) {} }); playing = []; }
+const noteFreq = st => { const o = Math.floor(st / 7), dg = ((st % 7) + 7) % 7; return 130.81 * Math.pow(2, o + HIJAZ[dg] / 12); };
+function tone(f, at, dur, type, gain) {
+  const o = ac.createOscillator(), g = ac.createGain(); o.type = type; o.frequency.value = f;
+  g.gain.setValueAtTime(0.0001, at); g.gain.exponentialRampToValueAtTime(gain, at + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+  o.connect(g).connect(ac.destination); o.start(at); o.stop(at + dur + 0.05); playing.push(o);
+}
+function drum(at, low) {
+  const o = ac.createOscillator(), g = ac.createGain();
+  o.frequency.setValueAtTime(low ? 110 : 420, at); o.frequency.exponentialRampToValueAtTime(low ? 45 : 200, at + 0.15);
+  g.gain.setValueAtTime(low ? 0.45 : 0.15, at); g.gain.exponentialRampToValueAtTime(0.0001, at + (low ? 0.3 : 0.08));
+  o.connect(g).connect(ac.destination); o.start(at); o.stop(at + 0.35); playing.push(o);
+}
+function crackle(at) {
+  const len = Math.floor(ac.sampleRate * 0.6), buf = ac.createBuffer(1, len, ac.sampleRate), ch = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) ch[i] = (Math.random() < 0.02 ? (Math.random() * 2 - 1) : (Math.random() * 2 - 1) * 0.15) * (1 - i / len);
+  const src = ac.createBufferSource(), g = ac.createGain(); src.buffer = buf; g.gain.value = 0.5;
+  src.connect(g).connect(ac.destination); src.start(at); playing.push(src);
+}
+function playSeries(vals, fireIdx) {
+  if (!audio()) return; stopSound();
+  const step = 0.26, t0 = ac.currentTime + 0.05;
+  vals.forEach((v, i) => {
+    const at = t0 + i * step; drum(at, i % 2 === 0);
+    if (i === fireIdx) crackle(at);
+    if (v != null) tone(noteFreq(Math.round(v * 14)), at, 0.3, "triangle", 0.2);
+  });
+}
+const spark = document.getElementById("spark"), sctx = spark.getContext("2d");
+function drawSpark(vals, label, color, fireIdx) {
+  const w = spark.width, h = spark.height; sctx.clearRect(0, 0, w, h);
+  sctx.strokeStyle = "rgba(154,160,173,.18)"; sctx.lineWidth = 1;
+  for (let k = 1; k < 4; k++) { sctx.beginPath(); sctx.moveTo(0, h * k / 4); sctx.lineTo(w, h * k / 4); sctx.stroke(); }
+  const X = i => 12 + i * (w - 24) / Math.max(1, vals.length - 1);
+  if (fireIdx != null && fireIdx >= 0) { sctx.fillStyle = "rgba(249,115,22,.25)"; sctx.fillRect(X(fireIdx) - 8, 34, 16, h - 40); }
+  const pts = vals.map((v, i) => v == null ? null : [X(i), h - 12 - v * (h - 48)]);
+  sctx.beginPath(); let on = false;
+  pts.forEach(p => { if (!p) { on = false; return; } on ? sctx.lineTo(...p) : sctx.moveTo(...p); on = true; });
+  sctx.strokeStyle = color; sctx.lineWidth = 3; sctx.stroke();
+  pts.forEach((p, i) => { if (!p) return; sctx.beginPath(); sctx.arc(p[0], p[1], i === state.idx[state.zone] ? 6 : 3.5, 0, 7); sctx.fillStyle = color; sctx.fill(); });
+  sctx.fillStyle = "#ece8e1"; sctx.font = "600 22px IBM Plex Sans, sans-serif"; sctx.fillText(label, 12, 26);
+}
+function bytes(c) { if (!c._b) { const s = atob(c.b64); c._b = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) c._b[i] = s.charCodeAt(i); } return c._b; }
+function seriesAt(z, ll) {
+  const [[s, w], [n, e]] = z.bounds, c = z.cube;
+  if (ll.lat < s || ll.lat > n || ll.lng < w || ll.lng > e) return null;
+  const col = Math.min(c.w - 1, Math.floor((ll.lng - w) / (e - w) * c.w)), row = Math.min(c.h - 1, Math.floor((n - ll.lat) / (n - s) * c.h));
+  const b = bytes(c), out = [];
+  for (let k = 0; k < c.t; k++) { const q = b[k * c.w * c.h + row * c.w + col]; out.push(q === 255 ? null : c.lo + q / 254 * (c.hi - c.lo)); }
+  return out;
+}
+const firstAfter = z => z.acquisitions.findIndex(a => a.phase !== "before");
+let marker = null;
+map.on("click", ev => {
+  const S = t();
+  const k = ORDER.find(q => seriesAt(D.zones[q], ev.latlng));
+  if (!k) { drawSpark([], S.outside, "#9aa0ad"); return; }
+  if (k !== state.zone) setZone(k, false);
+  const z = D.zones[k], ser = seriesAt(z, ev.latlng);
+  if (!ser.some(v => v != null)) { drawSpark([], S.no_data, "#9aa0ad"); return; }
+  const norm = ser.map(v => v == null ? null : Math.max(0, Math.min(1, (v + 10) / 14)));
+  const fi = firstAfter(z);
+  const pre = ser.slice(0, fi).filter(v => v != null), post = ser.slice(fi).filter(v => v != null);
+  const mean = a => a.reduce((x, y) => x + y, 0) / Math.max(1, a.length);
+  const drop = mean(post) - mean(pre);
+  const kind = drop < -1.5 ? S.pt_burn : mean(pre) > -3 ? S.pt_ok : S.pt_other;
+  const color = drop < -1.5 ? "#f97316" : mean(pre) > -3 ? "#a3e635" : "#cbd5e1";
+  drawSpark(norm, `HV · ${kind}`, color, fi);
+  if (marker) map.removeLayer(marker);
+  marker = L.circleMarker(ev.latlng, { radius: 7, color, weight: 2, fill: false }).addTo(map);
+  playSeries(norm, drop < -1.5 ? fi : -1);
+});
+document.getElementById("listen-site").addEventListener("click", () => {
+  const z = Z(), v = z.acquisitions.map(a => a.partial ? null : a.contrast);
+  const ok = v.filter(x => x != null), lo = Math.min(...ok), hi = Math.max(...ok);
+  const norm = v.map(x => x == null ? null : (x - lo) / Math.max(0.01, hi - lo));
+  drawSpark(norm, t().scar, "#f97316", firstAfter(z)); playSeries(norm, firstAfter(z));
+});
+document.getElementById("listen-stop").addEventListener("click", stopSound);
+
+// ---------------------------------------------------------------- charts
+Chart.defaults.color = "#9aa0ad"; Chart.defaults.font.family = "IBM Plex Sans, sans-serif"; Chart.defaults.borderColor = "rgba(154,160,173,.14)";
+let chPulse = null;
+const fireBand = {
+  id: "fireBand",
+  beforeDatasetsDraw(c, args, o) {
+    const { ctx, chartArea: a, scales: { x } } = c, x0 = x.getPixelForValue(o.from), x1 = x.getPixelForValue(o.to);
+    ctx.save(); ctx.fillStyle = "rgba(249,115,22,.16)"; ctx.fillRect(x0, a.top, Math.max(3, x1 - x0), a.bottom - a.top);
+    ctx.fillStyle = "#fdba74"; ctx.font = "600 12px IBM Plex Sans"; ctx.fillText(o.label, Math.min(x0 + 4, a.right - 80), a.top + 14); ctx.restore();
+  }
+};
+const trackColors = ["#f97316", "#38bdf8", "#e879f9", "#a3e635"];
+function buildPulse() {
+  if (chPulse) chPulse.destroy();
+  const z = Z(), S = t(), tracks = [...new Set(z.acquisitions.map(a => a.track))];
+  const ds = tracks.map((tr, j) => ({
+    type: "line", label: `${S.track} ${tr}`, yAxisID: "y", showLine: true, tension: 0.25, borderWidth: 2,
+    borderColor: trackColors[j % 4], backgroundColor: trackColors[j % 4], pointRadius: 4,
+    data: z.acquisitions.filter(a => a.track === tr && !a.partial && a.contrast != null).map(a => ({ x: Date.parse(a.date), y: a.contrast, key: a.key }))
+  }));
+  ds.push({ type: "bar", label: S.frac, yAxisID: "y2", backgroundColor: "rgba(203,213,225,.18)", borderWidth: 0, barThickness: 6,
+    data: z.acquisitions.filter(a => a.burned_frac != null && !a.partial).map(a => ({ x: Date.parse(a.date), y: a.burned_frac * 100 })) });
+  const xs = z.acquisitions.map(a => Date.parse(a.date));
+  chPulse = new Chart(document.getElementById("chart-pulse"), {
+    data: { datasets: ds }, plugins: [fireBand],
+    options: { maintainAspectRatio: false, animation: false, interaction: { mode: "nearest", intersect: false },
+      scales: {
+        x: { type: "linear", min: Math.min(...xs) - 6 * 864e5, max: Math.max(...xs) + 6 * 864e5,
+             ticks: { callback: v => new Date(v).toLocaleDateString(loc(), { day: "numeric", month: "short", timeZone: "UTC" }), maxTicksLimit: 10 } },
+        y: { title: { display: true, text: S.contrast }, suggestedMin: -8, suggestedMax: 1 },
+        y2: { position: "right", min: 0, max: 100, grid: { drawOnChartArea: false }, title: { display: true, text: S.frac } } },
+      plugins: { fireBand: { from: Date.parse(z.fire_start), to: Date.parse(z.fire_end), label: S.firewin },
+        legend: { labels: { usePointStyle: true } },
+        tooltip: { callbacks: { title: it => fmtDate(new Date(it[0].parsed.x).toISOString().slice(0, 10)),
+          label: it => it.dataset.yAxisID === "y2" ? ` ${nf(it.parsed.y)} %` : ` ${nf(it.parsed.y, 1)} dB` } } } }
+  });
+  highlight();
+}
+function highlight() {
+  if (!chPulse) return;
+  const cur = Z().acquisitions[state.idx[state.zone]];
+  chPulse.data.datasets.forEach(d => { if (d.type === "line") d.pointRadius = d.data.map(p => p.key === cur.key ? 9 : 4); });
+  chPulse.update("none");
+}
+
+// ---------------------------------------------------------------- panels
+function renderSites() {
+  const S = t();
+  document.getElementById("sites").innerHTML = ORDER.map(k => {
+    const z = D.zones[k], pct = z.burn.area_ha / z.official_ha * 100;
+    const flag = { ES: "ESPAÑA", FR: "FRANCE", MA: "المغرب · MAROC" }[z.country];
+    return `<button class="site" data-zone="${k}" aria-pressed="${k === state.zone}">
+      <span class="flag">${flag}</span><span class="nm">${shortName(z)}</span>
+      <span class="big">${nf(z.burn.area_ha)} <small>ha ${S.radar_w}</small></span>
+      <span class="vs">${nf(z.official_ha)} ha ${S.official} · ${nf(pct)} %</span>
+      <span class="meter"><i style="width:${Math.min(100, pct)}%"></i></span></button>`;
+  }).join("");
+  document.querySelectorAll(".site").forEach(b => b.addEventListener("click", () => setZone(b.dataset.zone)));
+}
+function renderInventory() {
+  const S = t(), Zs = D.inventory.zones, sum = f => Object.values(Zs).reduce((s, z) => s + (z[f] || 0), 0);
+  document.getElementById("inventory").innerHTML =
+    `<div><b>${nf(sum("gcov_provisional") + sum("gcov_validated"))}</b>${S.gcov}</div>` +
+    `<div><b>${nf(sum("gunw"))}</b>${S.gunw}</div>` +
+    `<div><b>${nf(sum("opera_dist_hls"))}</b>${S.dist}</div>`;
+  const rows = ORDER.map(k => { const v = Zs[k] || {}; return `<tr><td>${shortName(D.zones[k])}</td><td class="n">${v.gcov_provisional ?? "–"}</td><td class="n">${v.gcov_validated ?? "–"}</td><td class="n">${v.gunw ?? "–"}</td><td class="n">${v.opera_dist_hls ?? "–"}</td><td class="n">${v.first ? fmtDate(v.first) : "–"}</td><td>${(v.tracks || []).join(", ")}</td></tr>`; }).join("");
+  document.getElementById("data-table").innerHTML = `<thead><tr><th>${S.col_site}</th><th>${S.col_gcov}</th><th>${S.col_val}</th><th>${S.col_gunw}</th><th>${S.col_dist}</th><th>${S.col_first}</th><th>${S.col_tracks}</th></tr></thead><tbody>${rows}</tbody>`;
+}
+function renderCompare() {
+  const S = t();
+  document.getElementById("area-bars").innerHTML = ORDER.map(k => {
+    const z = D.zones[k], pct = z.burn.area_ha / z.official_ha * 100;
+    const cut = z.burn.touches_edge ? ` <small title="${S.edge}">↗</small>` : "";
+    return `<div class="bar"><span>${shortName(z)}${cut}</span><div class="track"><i style="width:${Math.min(100, pct)}%;background:var(--ember)"></i></div><span class="v">${nf(pct)} %</span></div>`;
+  }).join("");
+  document.getElementById("sev-bars").innerHTML = ORDER.map(k => {
+    const z = D.zones[k], b = z.burn.by_severity_ha, tot = Math.max(1, b.low + b.moderate + b.high);
+    return `<div class="bar"><span>${shortName(z)}</span><div class="track"><i style="width:${b.low / tot * 100}%;background:#fde047"></i><i style="width:${b.moderate / tot * 100}%;background:#f97316"></i><i style="width:${b.high / tot * 100}%;background:#be123c"></i></div><span class="v">${nf(b.high / tot * 100)} % ${S.high.toLowerCase()}</span></div>`;
+  }).join("");
+}
+function renderZonePanels() {
+  const S = t(), z = Z(), f = D.facts[state.zone] || {};
+  document.getElementById("facts-h").textContent = S.facts_h(shortName(z));
+  document.getElementById("facts").innerHTML = (lang === "fr" ? f.facts_fr : f.facts_en || []).map(x => `<li>${x}</li>`).join("");
+  const mx = Math.max(1, ...z.progression.map(p => p.ha));
+  document.getElementById("prog-bars").innerHTML = z.progression.map(p =>
+    `<div class="bar"><span>${p.date ? fmtDate(p.date) + " · " + S.track + " " + p.track : S.others}</span><div class="track"><i style="width:${p.ha / mx * 100}%;background:${p.color}"></i></div><span class="v">${nf(p.ha)} ha</span></div>`).join("");
+}
+function renderFooter() {
+  const all = [...ORDER.flatMap(k => (D.facts[k] || {}).sources || []), ...(D.facts.context.sources || [])];
+  const seen = new Set();
+  document.getElementById("sources").innerHTML = all.filter(([n, u]) => !seen.has(u) && seen.add(u)).map(([n, u]) => `<li><a href="${u}" target="_blank" rel="noopener">${n}</a></li>`).join("");
+  document.getElementById("context").textContent = D.facts.context[lang];
+}
+
+function applyLang(l) {
+  lang = l; try { localStorage.setItem("nabd-lang", l); } catch (e) {}
+  document.documentElement.lang = l;
+  document.getElementById("lang-fr").setAttribute("aria-pressed", l === "fr");
+  document.getElementById("lang-en").setAttribute("aria-pressed", l === "en");
+  const dict = l === "en" ? EN : FR;
+  document.querySelectorAll("[data-i18n]").forEach(el => { if (dict[el.dataset.i18n]) el.textContent = dict[el.dataset.i18n]; });
+  renderSites(); renderInventory(); renderCompare(); renderZonePanels(); renderFooter();
+  renderToggles(); renderLegend(); buildPulse(); setIndex(state.idx[state.zone]);
+  drawSpark([], t().click, "#9aa0ad");
+}
+document.getElementById("lang-fr").addEventListener("click", () => applyLang("fr"));
+document.getElementById("lang-en").addEventListener("click", () => applyLang("en"));
+
+// ---------------------------------------------------------------- start
+document.getElementById("demo-banner").hidden = !D.demo;
+map.fitBounds(D.zones[state.zone].focus || D.zones[state.zone].bounds, { padding: [8, 8] });
+syncLayers();
+applyLang(lang);
+})();
+</script>
+</body>
+</html>
