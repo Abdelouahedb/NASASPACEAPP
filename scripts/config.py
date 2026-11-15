@@ -63,7 +63,8 @@ MIN_COVERAGE = 0.90           # dates covering less of the zone are flagged "par
 
 # --- fields (agricultural zone), all in dB on the per-pixel time series of one orbit track
 FIELD_RULES = {
-    "water_hv_max": -24.0,     # mean HV below this and HH below -16 -> open water
+    "water_hv_max": -26.0,
+    "water_hh_max": -20.0,
     "urban_hh_min": -4.0,      # mean HH above this -> buildings (strong double bounce)
     "tree_hv_min": -15.5,      # mean HV above this and steady -> orchards / trees
     "tree_std_max": 1.2,
