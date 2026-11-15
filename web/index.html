@@ -4,44 +4,99 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>NABD — L'été de feu</title>
+<link rel="icon" href="logo-mark.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&family=Reem+Kufi:wght@600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Reem+Kufi:wght@600&display=swap" rel="stylesheet">
+<link rel="preload" href="vendor/fonts/archivo-latin-standard-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="vendor/leaflet.css">
 <style>
+/* Archivo, variable in weight and width: expanded for titles (aerospace stencil feel), normal for reading */
+@font-face { font-family: "Archivo"; font-style: normal; font-display: swap; font-weight: 100 900; font-stretch: 62% 125%;
+  src: url(vendor/fonts/archivo-latin-standard-normal.woff2) format("woff2");
+  unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
+@font-face { font-family: "Archivo"; font-style: normal; font-display: swap; font-weight: 100 900; font-stretch: 62% 125%;
+  src: url(vendor/fonts/archivo-latin-ext-standard-normal.woff2) format("woff2");
+  unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF; }
 :root {
   /* Layout: one "night after the fire" world. Site cards -> map + control rail -> evidence (pulse, areas, data). */
-  --ink: #0d0f14;
-  --panel: #151922;
-  --panel-2: #1c2230;
-  --line: #2a3142;
-  --text: #ece8e1;
-  --muted: #9aa0ad;
+  /* palette taken from the NABD logo: night violet, a pulse going from cyan to violet; orange stays for fire data */
+  --ink: #08061b;
+  --panel: rgba(14, 12, 32, .88);
+  --panel-2: rgba(52, 40, 112, .45);
+  --line: rgba(160, 150, 255, .18);
+  --text: #eef0fb;
+  --muted: #a8aacd;
+  --cyan: #3fe0ef;
+  --blue: #6f9dff;
+  --violet: #b07cf6;
+  --pulse: linear-gradient(90deg, var(--cyan), var(--blue) 55%, var(--violet));
+  --nebula: #b07cf6;
+  --glow: #3fe0ef;
   --ember: #f97316;        /* accent: fire */
   --ash: #cbd5e1;
   --forest: #a3e635;       /* data: living forest */
   --water: #38bdf8;
-  --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
-  --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
-  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  --display: "Archivo", "Segoe UI", system-ui, sans-serif;
+  --body: "Archivo", "Segoe UI", system-ui, sans-serif;
+  --mono: "Archivo", "Segoe UI", system-ui, sans-serif;
   --arabic: "Reem Kufi", "Noto Kufi Arabic", "Segoe UI", sans-serif;
-  --r: 10px;
+  --r: 14px;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
-html, body { margin: 0; background: var(--ink); color: var(--text); font: 15px/1.55 var(--body); }
-a { color: var(--ember); }
-:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; }
-h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; letter-spacing: -0.01em; }
-.wrap { max-width: 1340px; margin: 0 auto; padding: 0 20px; }
+html { background: #05060c; }
+body { margin: 0; background: transparent; color: var(--text); font: 15px/1.55 var(--body); }
+
+/* the launch film and the orbit behind the page */
+#space { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; z-index: 0; }
+body > header, body > main, body > footer { position: relative; z-index: 1; transition: opacity 1.1s ease .1s; }
+body.launching { overflow: hidden; }
+body.launching > header, body.launching > main, body.launching > footer { opacity: 0; pointer-events: none; }
+.launch { --bar: max(54px, calc((100vh - 100vw / 2.39) / 2)); position: fixed; z-index: 2; inset: auto 0 0 0; height: var(--bar); display: flex; justify-content: space-between; align-items: center; gap: 24px; padding: 0 clamp(18px, 4vw, 48px); pointer-events: none; transition: opacity .5s ease; }
+.title-card { position: fixed; z-index: 2; inset: 0; display: grid; place-content: center; text-align: center; pointer-events: none; color: #f6f2ea; opacity: 0; }
+body.titling .title-card { animation: title 3.4s cubic-bezier(.2,.7,.2,1) forwards; }
+.title-card .logo-big { display: grid; justify-items: center; }
+.title-card .mark { width: clamp(220px, 30vw, 380px); height: auto; overflow: visible; filter: drop-shadow(0 0 18px rgba(111,157,255,.45)); }
+.title-card .mark .line, .title-card .mark .glow { stroke-dasharray: 260; stroke-dashoffset: 260; }
+body.titling .title-card .mark .line, body.titling .title-card .mark .glow { animation: draw 1.3s .2s cubic-bezier(.6,0,.2,1) forwards; }
+.title-card .mark .planet, .title-card .mark .spark { opacity: 0; transform-origin: 88px 9.5px; }
+body.titling .title-card .mark .planet { animation: pop .7s 1.15s cubic-bezier(.2,1.6,.4,1) forwards; }
+body.titling .title-card .mark .spark { animation: pop .6s 1.4s ease forwards; }
+.title-card b { display: block; margin-top: 10px; font: 800 clamp(46px, 7.5vw, 104px)/1 var(--display); font-stretch: 125%; letter-spacing: .14em; margin-right: -.14em; text-shadow: 0 6px 40px rgba(0,0,0,.55); }
+.title-card i { display: block; width: min(60%, 340px); height: 1px; margin: 16px auto 12px; background: linear-gradient(90deg, transparent, rgba(238,240,251,.6), transparent); }
+.title-card em { display: block; font: 600 clamp(34px, 5vw, 62px)/1 var(--arabic); font-style: normal; }
+body.titling .title-card b { animation: track 3.1s cubic-bezier(.2,.7,.2,1) forwards; }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+@keyframes pop { from { opacity: 0; transform: scale(.3); } to { opacity: 1; transform: scale(1); } }
+.title-card span { display: block; margin-top: 14px; font: 400 clamp(14px, 1.5vw, 19px)/1.4 var(--body); font-stretch: 110%; letter-spacing: .06em; color: #e9e3d8; text-shadow: 0 2px 18px rgba(0,0,0,.7); }
+@keyframes title { 0% { opacity: 0; } 18% { opacity: 1; } 62% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes track { from { letter-spacing: .08em; margin-right: -.08em; } to { letter-spacing: .2em; margin-right: -.2em; } }
+.launch .sound { margin-left: auto; }
+.launch .ctrls { display: flex; gap: 10px; pointer-events: auto; }
+body:not(.launching) .launch { opacity: 0; visibility: hidden; transition: opacity .5s ease, visibility 0s .5s; }
+.launch p { margin: 0; max-width: 60ch; font: 400 clamp(14px, 1.35vw, 18px)/1.4 var(--body); font-stretch: 108%; letter-spacing: .01em; color: #efe9df; transition: opacity .3s; }
+.launch button { pointer-events: auto; flex: none; background: none; color: #f6f2ea; border: 1px solid rgba(246,242,234,.4); border-radius: 999px; padding: 7px 14px; font: 500 13px var(--body); font-stretch: 110%; cursor: pointer; }
+.launch button[aria-pressed="true"] { border-color: var(--cyan); color: var(--cyan); }
+.launch button:hover { background: rgba(246,242,234,.12); }
+
+body > header { position: sticky; top: 0; z-index: 5; border-bottom: 1px solid var(--line); background: rgba(9,7,28,.9); }
+a { color: #8fd8ff; }
+:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+h1, h2, h3 { font-family: var(--display); font-stretch: 125%; font-weight: 600; text-wrap: balance; margin: 0; letter-spacing: -0.012em; }
+.num, .inv b, .site .big, .date-line .d, .stat b, .bar .v, td.n, .chip { font-variant-numeric: tabular-nums; font-stretch: 112%; }
+.wrap { max-width: 1240px; margin: 0 auto; padding: 0 clamp(22px, 5vw, 64px); }
 .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 .muted { color: var(--muted); }
 
-header { border-bottom: 1px solid var(--line); }
 .top { display: flex; align-items: center; gap: 16px; padding: 14px 0; flex-wrap: wrap; }
 .brand { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
-.brand h1 { font-size: 28px; font-weight: 800; }
-.brand .ar { font-family: var(--arabic); font-size: 26px; color: var(--ember); }
+.brand h1 { margin: 0; }
+.logo { display: flex; align-items: center; gap: 12px; color: var(--text); text-decoration: none; }
+.logo .mark { width: 78px; height: 39px; flex: none; overflow: visible; }
+.logo .word { font: 800 25px/1 var(--display); font-stretch: 125%; letter-spacing: .07em; }
+.logo .sep { width: 1px; height: 26px; background: linear-gradient(transparent, rgba(238,240,251,.55), transparent); }
+.logo .ar { font: 600 25px/1 var(--arabic); }
 .brand .tag { color: var(--muted); font-size: 14px; }
 .spacer { flex: 1; }
 .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
@@ -49,43 +104,58 @@ header { border-bottom: 1px solid var(--line); }
 .seg button[aria-pressed="true"] { background: var(--panel-2); color: var(--text); }
 .demo { background: #3a220b; border: 1px solid #8a4b12; color: #fed7aa; padding: 8px 14px; border-radius: var(--r); font-size: 13.5px; margin: 12px 0 0; }
 
-.intro { display: grid; grid-template-columns: 1fr 1.25fr; gap: 28px; padding: 24px 0 18px; align-items: start; }
-.intro h2 { font-size: 32px; line-height: 1.12; margin-bottom: 10px; }
-.intro p { margin: 0 0 10px; max-width: 62ch; color: #d8d4cc; }
+.intro { display: grid; grid-template-columns: minmax(0, 600px) 1fr; gap: 28px; padding: clamp(28px, 7vh, 72px) 0 22px; min-height: min(64vh, 640px); align-items: center; }
+.intro h2 { font-size: clamp(30px, 3.6vw, 50px); font-weight: 560; line-height: 1.02; letter-spacing: -0.02em; margin-bottom: 16px; }
+.intro p { margin: 0 0 10px; max-width: 58ch; color: #e2def0; text-shadow: 0 1px 10px rgba(4,3,15,.9); }
+.intro > div:first-child { position: relative; }
+.intro > div:first-child::before { content: ""; position: absolute; inset: -60px -90px -40px -120px; z-index: -1; pointer-events: none;
+  background: radial-gradient(closest-side, rgba(4,3,15,.62), rgba(4,3,15,0)); }
+.orbit-note { align-self: end; justify-self: end; margin: 0; max-width: 300px; text-align: right; font-size: 13px; color: #bdb8dc; text-shadow: 0 1px 10px rgba(4,3,15,.9); }
+.orbit-note button { margin-top: 8px; background: none; border: 1px solid rgba(246,242,234,.35); color: #f1ede6; border-radius: 999px; padding: 6px 12px; font: 600 12.5px var(--body); cursor: pointer; }
+.orbit-note button:hover { border-color: var(--cyan); }
+.card { border-radius: 14px; padding: 16px 18px; }
+.card h3 { font-size: 14px; font-stretch: 112%; letter-spacing: .01em; margin-bottom: 10px; color: #f3f1ff; }
+.site { border-radius: 14px; padding: 14px 16px 16px; transition: transform .18s ease, border-color .18s ease; }
+.site:hover { transform: translateY(-2px); }
+.site .big { font-size: 28px !important; font-weight: 650; }
+section.block > h2::after { content: ""; display: block; width: 44px; height: 3px; margin-top: 10px; border-radius: 2px; background: var(--pulse); }
+.rail .card, .two .card, .steps .card { height: 100%; }
+#map { border-radius: 14px !important; }
+:focus-visible { outline-color: var(--glow); }
 .inv { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 12px; }
 .inv div { font-size: 12.5px; color: var(--muted); }
 .inv b { display: block; font: 600 22px var(--mono); color: var(--text); }
-.sites { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-.site { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px; cursor: pointer; text-align: left; color: var(--text); font: inherit; display: flex; flex-direction: column; gap: 4px; }
-.site[aria-pressed="true"] { border-color: var(--ember); box-shadow: inset 0 3px 0 var(--ember); }
+.sites { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 18px; }
+.site { background: var(--panel); border: 1px solid rgba(160,150,255,.16); border-radius: var(--r); padding: 14px 16px 16px; cursor: pointer; text-align: left; color: var(--text); font: inherit; display: flex; flex-direction: column; gap: 4px; }
+.site[aria-pressed="true"] { border-color: rgba(176,124,246,.75); }
 .site .flag { font-size: 12px; color: var(--muted); letter-spacing: .04em; }
 .site .nm { font: 700 16px var(--display); }
 .site .big { font: 600 24px var(--mono); }
 .site .big small { font-size: 13px; color: var(--muted); font-weight: 400; }
 .site .vs { font-size: 12.5px; color: var(--muted); }
 .meter { height: 6px; background: var(--panel-2); border-radius: 3px; overflow: hidden; margin-top: 4px; }
-.meter i { display: block; height: 100%; background: var(--ember); }
+.meter i { display: block; height: 100%; background: var(--pulse); }
 
 .stage { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 14px; }
 .mapbox { position: relative; }
-#map { height: 620px; border-radius: var(--r); border: 1px solid var(--line); background: #10141c; }
+#map { height: 620px; border-radius: var(--r); border: 1px solid var(--line); background: #0b0a1c; }
 .leaflet-container { font: 13px var(--body); }
-.leaflet-control-attribution { background: rgba(13,15,20,.75) !important; color: var(--muted) !important; }
+.leaflet-control-attribution { background: rgba(8,6,24,.75) !important; color: var(--muted) !important; }
 .leaflet-control-attribution a { color: var(--muted) !important; }
 .leaflet-bar a { background: var(--panel-2); color: var(--text); border-color: var(--line); }
 .leaflet-tooltip.tip { background: var(--panel); color: var(--text); border: 1px solid var(--line); box-shadow: none; }
 #swipe { position: absolute; top: 0; bottom: 0; width: 0; border-left: 2px solid #fff; z-index: 500; display: none; pointer-events: none; }
 #swipe span { position: absolute; top: 50%; left: -16px; width: 32px; height: 32px; margin-top: -16px; border-radius: 50%; background: #fff; color: #111; display: grid; place-items: center; font-weight: 700; pointer-events: auto; cursor: ew-resize; }
 .swipe-labels { position: absolute; top: 10px; left: 56px; right: 10px; z-index: 500; display: none; justify-content: space-between; pointer-events: none; }
-.swipe-labels b { background: rgba(13,15,20,.8); padding: 3px 8px; border-radius: 6px; font-size: 12.5px; }
+.swipe-labels b { background: rgba(8,6,24,.8); padding: 3px 8px; border-radius: 6px; font-size: 12.5px; }
 
 .rail { display: flex; flex-direction: column; gap: 12px; }
-.card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 14px; }
+.card { background: var(--panel); border: 1px solid rgba(160,150,255,.16); border-radius: var(--r); padding: 16px 18px; }
 .card h3 { font-size: 15px; margin-bottom: 8px; }
 .time { display: flex; align-items: center; gap: 10px; }
-.play { width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--ember); background: none; color: var(--ember); cursor: pointer; font-size: 15px; flex: none; }
-.play:hover { background: rgba(249,115,22,.12); }
-input[type=range] { width: 100%; accent-color: var(--ember); }
+.play { width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--cyan); background: none; color: var(--cyan); cursor: pointer; font-size: 15px; flex: none; }
+.play:hover { background: rgba(63,224,239,.12); }
+input[type=range] { width: 100%; accent-color: var(--violet); }
 .date-line { display: flex; justify-content: space-between; align-items: baseline; margin-top: 6px; gap: 8px; flex-wrap: wrap; }
 .date-line .d { font: 600 18px var(--mono); }
 .chip { display: inline-block; font-size: 11.5px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
@@ -97,19 +167,19 @@ input[type=range] { width: 100%; accent-color: var(--ember); }
 .stat b { font: 600 15px var(--mono); white-space: nowrap; }
 .toggles { display: flex; flex-wrap: wrap; gap: 6px; }
 .toggles label { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; padding: 5px 10px; border: 1px solid var(--line); border-radius: 999px; cursor: pointer; background: var(--panel-2); }
-.toggles input { accent-color: var(--ember); margin: 0; }
+.toggles input { accent-color: var(--violet); margin: 0; }
 .legend { display: grid; gap: 4px; margin-top: 10px; font-size: 12.5px; }
 .legend div { display: flex; align-items: center; gap: 8px; }
 .sw { width: 14px; height: 14px; border-radius: 3px; flex: none; border: 1px solid rgba(255,255,255,.15); }
 .ramp { height: 10px; border-radius: 3px; flex: 1; }
 .listen canvas { width: 100%; height: 76px; display: block; background: var(--panel-2); border-radius: 6px; margin: 8px 0; }
-.btn { background: var(--ember); color: #1b0d03; border: 0; border-radius: 8px; padding: 8px 12px; font: 600 13.5px var(--body); cursor: pointer; }
-.btn.ghost { background: none; color: var(--ember); border: 1px solid var(--ember); }
+.btn { background: var(--pulse); color: #0b0820; border: 0; border-radius: 8px; padding: 8px 12px; font: 600 13.5px var(--body); cursor: pointer; }
+.btn.ghost { background: none; color: var(--cyan); border: 1px solid var(--cyan); }
 .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
 
 section.block { padding: 34px 0 6px; }
-section.block > h2 { font-size: 24px; margin-bottom: 6px; }
-section.block > p.lead { color: #d8d4cc; max-width: 72ch; margin: 0 0 16px; }
+section.block > h2 { font-size: 26px; margin-bottom: 12px; }
+section.block > p.lead { color: #d9d5ea; max-width: 72ch; margin: 0 0 16px; }
 .two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .chart-box { position: relative; height: 320px; }
 .bars { display: grid; gap: 10px; }
@@ -117,22 +187,98 @@ section.block > p.lead { color: #d8d4cc; max-width: 72ch; margin: 0 0 16px; }
 .bar .track { background: var(--panel-2); border-radius: 4px; height: 12px; overflow: hidden; display: flex; }
 .bar .track i { display: block; height: 100%; }
 .bar .v { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
-.facts { margin: 0; padding-left: 18px; font-size: 14px; color: #d8d4cc; }
+.facts { margin: 0; padding-left: 18px; font-size: 14px; color: #d9d5ea; }
 .facts li { margin-bottom: 4px; }
 .steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; counter-reset: s; }
-.steps .card h3::before { counter-increment: s; content: counter(s) "  "; color: var(--ember); font-family: var(--mono); }
-.steps p { margin: 0; font-size: 13.5px; color: #d8d4cc; }
+.steps .card h3::before { counter-increment: s; content: counter(s) "  "; color: var(--cyan); font-family: var(--mono); }
+.steps p { margin: 0; font-size: 13.5px; color: #d9d5ea; }
 table.data { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 table.data th, table.data td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); }
 table.data td.n { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
 table.data th { color: var(--muted); font-weight: 500; }
 .tablewrap { overflow-x: auto; }
-footer { border-top: 1px solid var(--line); margin-top: 40px; padding: 20px 0 40px; font-size: 13px; color: var(--muted); }
+footer { border-top: 1px solid var(--line); margin-top: 40px; padding: 20px 0 40px; font-size: 13px; color: var(--muted); background: rgba(8,6,24,.94); }
 footer ul { margin: 6px 0 0; padding-left: 18px; columns: 2; column-gap: 32px; }
 footer li { margin-bottom: 4px; break-inside: avoid; }
 
+
+/* ---- liquid glass: clear, neutral (no colour tint), frosted backdrop, light caught on the rim, a highlight that follows the pointer.
+   Blur is kept small and only on the panels themselves; body.lite (slow machines) and reduced-transparency fall back to frosted solid. */
+:root { --glass-fill: rgba(255,255,255,.045); --glass-edge: rgba(255,255,255,.14); --panel: rgba(16,17,28,.5); --panel-2: rgba(255,255,255,.07); --line: rgba(255,255,255,.12); --text: #eef0f6; --muted: #a3a8ba; }
+.card, .site, body > header, footer {
+  position: relative;
+  background:
+    radial-gradient(140% 90% at 0% 0%, rgba(255,255,255,.09), rgba(255,255,255,0) 50%),
+    linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.015)),
+    rgba(12, 13, 22, .34);
+  -webkit-backdrop-filter: blur(9px) saturate(165%);
+  backdrop-filter: blur(9px) saturate(165%);
+  border: 1px solid var(--glass-edge);
+  box-shadow: inset 0 0 18px rgba(255,255,255,.035), 0 22px 44px -28px rgba(0,0,0,.75);
+}
+body > header { position: sticky; top: 0; z-index: 5; border-width: 0 0 1px; border-radius: 0; box-shadow: 0 10px 30px -20px rgba(0,0,0,.8); background: rgba(10,11,20,.42); }
+footer { border-width: 1px 0 0; border-radius: 0; box-shadow: none; }
+.card::before, .site::before {                     /* rim light: bright where light enters (upper left) and exits (lower right) */
+  content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px; pointer-events: none;
+  background: linear-gradient(135deg, rgba(255,255,255,.5), rgba(255,255,255,.08) 28%, rgba(255,255,255,0) 55%, rgba(255,255,255,.08) 80%, rgba(255,255,255,.32));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude;
+}
+.card::after, .site::after {                       /* specular spot under the pointer */
+  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0; transition: opacity .25s ease;
+  background: radial-gradient(320px circle at var(--mx, 50%) var(--my, 0%), rgba(255,255,255,.10), rgba(255,255,255,0) 60%);
+}
+.card:hover::after, .site:hover::after { opacity: 1; }
+.card { border-radius: 18px; padding: 16px 18px; }
+.site { border-radius: 18px; padding: 15px 18px 17px; transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease; }
+.site:hover { transform: translateY(-2px); }
+.site[aria-pressed="true"] { border-color: rgba(140,190,255,.55); background-image: radial-gradient(140% 90% at 0% 0%, rgba(160,200,255,.16), rgba(255,255,255,0) 55%), linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.02)); box-shadow: inset 0 0 22px rgba(140,190,255,.08), 0 0 0 1px rgba(111,157,255,.25), 0 18px 46px -22px rgba(63,140,255,.45); }
+.card > *, .site > * { position: relative; z-index: 1; }
+.seg { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.14); }
+.seg button[aria-pressed="true"] { background: rgba(255,255,255,.14); }
+.toggles label { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.12); }
+.listen canvas, .meter, .bar .track { background: rgba(255,255,255,.07) !important; }
+.demo { background: rgba(120,70,20,.35); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+body.lite .card, body.lite .site, body.lite > header, body.lite footer { -webkit-backdrop-filter: none; backdrop-filter: none; background: rgba(16,17,28,.9); }
+@media (prefers-reduced-transparency: reduce) { .card, .site, body > header, footer { -webkit-backdrop-filter: none; backdrop-filter: none; background: rgba(16,17,28,.92); } }
+
+/* ---- floating liquid-glass navbar */
+html { scroll-behavior: smooth; }
+#explorer, section.block[id] { scroll-margin-top: 100px; }
+body > header.nav-shell { position: sticky; top: 0; z-index: 20; padding: 14px clamp(14px, 3vw, 40px) 0; margin-bottom: -6px;
+  background: none !important; border: 0 !important; box-shadow: none !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; pointer-events: none; }
+.navbar { pointer-events: auto; position: relative; max-width: 1240px; margin: 0 auto; height: 66px; display: flex; align-items: center; gap: 10px; padding: 0 9px 0 20px; border-radius: 999px;
+  background: radial-gradient(120% 140% at 15% 0%, rgba(255,255,255,.16), rgba(255,255,255,0) 55%), linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,.05)), rgba(16,18,32,.38);
+  -webkit-backdrop-filter: blur(18px) saturate(180%); backdrop-filter: blur(18px) saturate(180%);
+  border: 1px solid rgba(255,255,255,.2); box-shadow: inset 0 0 26px rgba(255,255,255,.06), 0 14px 40px -16px rgba(0,0,0,.7); }
+.navbar::before { content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1.2px; pointer-events: none;
+  background: linear-gradient(100deg, rgba(255,255,255,.65), rgba(255,255,255,.1) 25%, rgba(255,255,255,0) 50%, rgba(255,255,255,.12) 75%, rgba(255,255,255,.5));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
+.navbar .logo { flex: none; gap: 10px; }
+.navbar .logo .mark { width: 62px; height: 31px; }
+.navbar .logo .word { font-size: 21px; }
+.navbar .logo .ar { font-size: 22px; }
+.navbar .logo .sep { height: 22px; }
+.links { display: flex; gap: 2px; list-style: none; margin: 0 auto; padding: 0; }
+.links a { display: block; padding: 11px 18px; border-radius: 999px; color: rgba(238,240,246,.84); text-decoration: none; font: 500 15px/1 var(--body); transition: background-color .2s ease, color .2s ease; }
+.links a:hover { color: #fff; background: rgba(255,255,255,.09); }
+.links a[aria-current="true"] { color: #0c0f1c; background: linear-gradient(180deg, rgba(255,255,255,.96), rgba(228,234,252,.86)); box-shadow: 0 6px 16px -8px rgba(0,0,0,.6); }
+.navbar .seg { flex: none; height: 46px; align-items: center; padding: 3px; gap: 2px; background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.16); }
+.navbar .seg button { height: 38px; min-width: 42px; border-radius: 999px; padding: 0 10px; }
+.navbar .seg button[aria-pressed="true"] { background: rgba(255,255,255,.9); color: #0c0f1c; }
+.cta { flex: none; height: 50px; display: inline-flex; align-items: center; padding: 0 24px; border-radius: 999px; text-decoration: none; color: #fff; font: 600 15px/1 var(--body);
+  background: linear-gradient(90deg, #22a6e0, #5b7cf6 55%, #8f63ee); box-shadow: inset 0 0 0 1px rgba(255,255,255,.18), 0 10px 24px -12px rgba(80,110,255,.9); transition: filter .2s ease; }
+.cta:hover { filter: brightness(1.12); color: #fff; }
+.intro { padding-top: clamp(40px, 9vh, 96px); }
+@media (max-width: 1080px) { .links { display: none; } .navbar .seg { margin-left: auto; } }
+@media (max-width: 560px) { .cta { display: none; } .navbar { height: 58px; padding-left: 14px; } .navbar .logo .ar, .navbar .logo .sep { display: none; } }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+/* below-the-fold blocks are only painted when they come near the screen */
+section.block#methode, section.block#donnees { content-visibility: auto; contain-intrinsic-size: auto 700px; }
+
 @media (max-width: 1050px) {
   .intro, .stage, .two { grid-template-columns: 1fr; }
+  .intro { min-height: 0; }
+  .orbit-note { justify-self: start; text-align: left; margin-top: 30vh; }
   .steps { grid-template-columns: 1fr 1fr; }
   #map { height: 480px; }
   footer ul { columns: 1; }
@@ -144,24 +290,68 @@ footer li { margin-bottom: 4px; break-inside: avoid; }
   .brand h1 { font-size: 24px; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+@media (max-width: 560px) { .launch { flex-direction: column; align-items: flex-start; } }
 </style>
 </head>
 <body>
-<header>
-  <div class="wrap top">
-    <div class="brand">
-      <h1>NABD</h1><span class="ar" lang="ar">نبض</span>
-      <span class="tag" data-i18n="tagline">L'été de feu 2026 : le pouls des forêts, vu par le radar NISAR</span>
-    </div>
-    <div class="spacer"></div>
+<script>
+  // play the launch once; afterwards (or with reduced motion) open straight onto the orbit
+  (function () {
+    var still = matchMedia("(prefers-reduced-motion: reduce)").matches, seen = false;
+    try { seen = localStorage.getItem("nabd-launch-seen") === "1"; } catch (e) {}
+    document.documentElement.dataset.launch = still ? "still" : seen ? "orbit" : "play";
+    if (!still && !seen) document.body.classList.add("launching");
+    setTimeout(function () { if (!window.__launchOK) document.body.classList.remove("launching"); }, 8000);
+  })();
+</script>
+<canvas id="space" aria-hidden="true"></canvas>
+<div class="title-card" aria-hidden="true"><div class="logo-big"><svg class="mark" viewBox="0 0 160 80" aria-hidden="true" focusable="false">
+  <defs>
+    <linearGradient id="t-pulse" x1="0" y1="0" x2="160" y2="0" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#3fe0ef"/><stop offset=".55" stop-color="#6f9dff"/><stop offset="1" stop-color="#b07cf6"/></linearGradient>
+    <radialGradient id="t-planet" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="#e3d4ff"/><stop offset=".55" stop-color="#9d74f2"/><stop offset="1" stop-color="#5b3cc4"/></radialGradient>
+    <filter id="t-glow" x="-20%" y="-60%" width="140%" height="220%"><feGaussianBlur stdDeviation="2.6"/></filter>
+  </defs>
+  <path class="glow" d="M2 52H38C42 52 44 46 47 46S52 52 56 52H64L70 40L78 68L88 16L97 58L103 46H112C116 46 118 40 121 40S126 46 130 46H158" fill="none" stroke="url(#t-pulse)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" filter="url(#t-glow)" opacity=".55"/>
+  <path class="line" d="M2 52H38C42 52 44 46 47 46S52 52 56 52H64L70 40L78 68L88 16L97 58L103 46H112C116 46 118 40 121 40S126 46 130 46H158" fill="none" stroke="url(#t-pulse)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <g class="planet"><circle cx="88" cy="9.5" r="5.6" fill="url(#t-planet)"/><ellipse cx="88" cy="9.5" rx="10" ry="3.1" fill="none" stroke="#c9b4ff" stroke-width="1.2" transform="rotate(-18 88 9.5)"/></g>
+  <path class="spark" d="M56 24l1.2 3 3 1.2-3 1.2-1.2 3-1.2-3-3-1.2 3-1.2zM124 22l1 2.5 2.5 1-2.5 1-1 2.5-1-2.5-2.5-1 2.5-1z" fill="#d6ecff"/>
+</svg><b>NABD</b><i></i><em lang="ar">نبض</em></div><span data-i18n="title_sub">Le pouls des forêts, vu depuis l'espace</span></div>
+<div class="launch" id="launch">
+  <p id="launch-cap" aria-live="polite"></p>
+  <div class="ctrls">
+    <button id="launch-sound" type="button" aria-pressed="false" data-i18n="sound">Son</button>
+    <button id="launch-skip" type="button" data-i18n="skip">Passer l'intro</button>
+  </div>
+</div>
+<header class="nav-shell">
+  <nav class="navbar" aria-label="Navigation">
+    <a class="logo" href="#top" aria-label="NABD نبض"><svg class="mark" viewBox="0 0 160 80" aria-hidden="true" focusable="false">
+  <defs>
+    <linearGradient id="g-pulse" x1="0" y1="0" x2="160" y2="0" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#3fe0ef"/><stop offset=".55" stop-color="#6f9dff"/><stop offset="1" stop-color="#b07cf6"/></linearGradient>
+    <radialGradient id="g-planet" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="#e3d4ff"/><stop offset=".55" stop-color="#9d74f2"/><stop offset="1" stop-color="#5b3cc4"/></radialGradient>
+    <filter id="g-glow" x="-20%" y="-60%" width="140%" height="220%"><feGaussianBlur stdDeviation="2.6"/></filter>
+  </defs>
+  <path class="glow" d="M2 52H38C42 52 44 46 47 46S52 52 56 52H64L70 40L78 68L88 16L97 58L103 46H112C116 46 118 40 121 40S126 46 130 46H158" fill="none" stroke="url(#g-pulse)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" filter="url(#g-glow)" opacity=".55"/>
+  <path class="line" d="M2 52H38C42 52 44 46 47 46S52 52 56 52H64L70 40L78 68L88 16L97 58L103 46H112C116 46 118 40 121 40S126 46 130 46H158" fill="none" stroke="url(#g-pulse)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <g class="planet"><circle cx="88" cy="9.5" r="5.6" fill="url(#g-planet)"/><ellipse cx="88" cy="9.5" rx="10" ry="3.1" fill="none" stroke="#c9b4ff" stroke-width="1.2" transform="rotate(-18 88 9.5)"/></g>
+  <path class="spark" d="M56 24l1.2 3 3 1.2-3 1.2-1.2 3-1.2-3-3-1.2 3-1.2zM124 22l1 2.5 2.5 1-2.5 1-1 2.5-1-2.5-2.5-1 2.5-1z" fill="#d6ecff"/>
+</svg><span class="word">NABD</span><span class="sep"></span><span class="ar" lang="ar">نبض</span></a>
+    <ul class="links">
+      <li><a href="#explorer" data-i18n="nav_map">Carte</a></li>
+      <li><a href="#pouls" data-i18n="nav_pulse">Pouls</a></li>
+      <li><a href="#chiffres" data-i18n="nav_compare">Chiffres</a></li>
+      <li><a href="#methode" data-i18n="nav_method">Méthode</a></li>
+      <li><a href="#donnees" data-i18n="nav_data">Données</a></li>
+    </ul>
     <div class="seg" role="group" aria-label="Langue / Language">
       <button id="lang-fr" aria-pressed="true">FR</button>
       <button id="lang-en" aria-pressed="false">EN</button>
     </div>
-  </div>
+    <a class="cta" href="#explorer" data-i18n="nav_cta">Explorer la carte</a>
+  </nav>
 </header>
 
-<main class="wrap">
+<main class="wrap" id="top">
   <div id="demo-banner" class="demo" hidden data-i18n="demo">Données radar de démonstration (synthétiques) : le pipeline et l'interface sont réels et les dates des passages NISAR sont les vraies. Les cartes se remplissent avec les vraies images dès leur téléchargement. Les chiffres officiels des incendies sont réels.</div>
 
   <div class="intro">
@@ -171,10 +361,12 @@ footer li { margin-bottom: 4px; break-inside: avoid; }
       <p data-i18n="p_intro2">Son radar en bande L (24 cm) traverse la fumée et « touche » les branches et les troncs. Quand une forêt brûle, ce signal s'effondre. NABD mesure cette chute pixel par pixel : où le feu est passé, avec quelle violence, et si la forêt repart.</p>
       <div class="inv" id="inventory"></div>
     </div>
-    <div class="sites" id="sites" role="group" aria-label="Incendies"></div>
+    <p class="orbit-note"><span data-i18n="orbit_note">NISAR à 747 km d'altitude, vue reconstituée. Il repasse au-dessus de chaque forêt tous les 12 jours.</span><br>
+      <button id="launch-replay" type="button" data-i18n="replay">Revoir le lancement</button></p>
   </div>
+  <div class="sites" id="sites" role="group" aria-label="Incendies"></div>
 
-  <div class="stage">
+  <div class="stage" id="explorer">
     <div class="mapbox">
       <div id="map" role="region" aria-label="Carte radar"></div>
       <div id="swipe"><span aria-hidden="true">⇆</span></div>
@@ -207,13 +399,13 @@ footer li { margin-bottom: 4px; break-inside: avoid; }
     </aside>
   </div>
 
-  <section class="block">
+  <section class="block" id="pouls">
     <h2 data-i18n="h_pulse">Le pouls de la forêt</h2>
     <p class="lead" data-i18n="p_pulse">Chaque point est un passage de NISAR. La courbe montre le signal HV de la zone brûlée moins celui de la forêt intacte voisine, ce qui annule les effets de saison et d'orbite. Avant le feu, elle reste à plat près de 0. Pendant le feu (bande orange), elle plonge. Après, on voit si la forêt repart.</p>
     <div class="card"><div class="chart-box"><canvas id="chart-pulse" aria-label="Pouls de la forêt"></canvas></div></div>
   </section>
 
-  <section class="block">
+  <section class="block" id="chiffres">
     <h2 data-i18n="h_compare">Le radar contre les chiffres officiels</h2>
     <p class="lead" data-i18n="p_compare">Surface brûlée mesurée automatiquement par NISAR (périmètre de la cicatrice), comparée au bilan des autorités. Chaque barre est en pourcentage du chiffre officiel. Le radar bande L voit surtout le bois : les herbes et les broussailles brûlées changent peu son signal.</p>
     <div class="two">
@@ -232,7 +424,7 @@ footer li { margin-bottom: 4px; break-inside: avoid; }
     </div>
   </section>
 
-  <section class="block">
+  <section class="block" id="methode">
     <h2 data-i18n="h_method">Comment ça marche</h2>
     <div class="steps">
       <div class="card"><h3 data-i18n="s1_h">Données NISAR</h3><p data-i18n="s1">Produit GCOV bande L, HH et HV, corrigé du relief. Seule la fenêtre de chaque feu est découpée côté NASA : quelques Mo au lieu de 6 Go par image. Les cadres voisins d'un même passage sont assemblés.</p></div>
@@ -242,7 +434,7 @@ footer li { margin-bottom: 4px; break-inside: avoid; }
     </div>
   </section>
 
-  <section class="block">
+  <section class="block" id="donnees">
     <h2 data-i18n="h_data">Les données utilisées et disponibles</h2>
     <p class="lead" data-i18n="p_data">Toutes viennent du catalogue de la NASA (Earthdata, ASF). Comptage du 14 novembre 2026 : relancez 01_search.py pour le chiffre à jour.</p>
     <div class="card tablewrap"><table class="data" id="data-table"></table></div>
@@ -258,6 +450,7 @@ footer li { margin-bottom: 4px; break-inside: avoid; }
   </div>
 </footer>
 
+<script type="importmap">{ "imports": { "three": "./vendor/three/three.module.min.js", "three/addons/": "./vendor/three/addons/" } }</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="data/data.js"></script>
@@ -270,6 +463,7 @@ const ORDER = D.order;
 // ---------------------------------------------------------------- i18n
 const EN = {
   tagline: "Summer of fire 2026: the pulse of forests, seen by the NISAR radar",
+  nav_map: "Map", nav_pulse: "Pulse", nav_compare: "Figures", nav_method: "Method", nav_data: "Data", nav_cta: "Explore the map",
   demo: "Demo radar data (synthetic): the pipeline and the interface are real, and the NISAR pass dates are the real ones. The maps fill with the real images as soon as they are downloaded. Official fire figures are real.",
   h_intro: "July 2026: the Mediterranean burns. A radar sees through the smoke.",
   p_intro1: "In ten days, two record fires consumed nearly 1,000 km² of forest in Spain and France. In Morocco, the Middle Atlas burned too. Meanwhile NISAR (NASA–ISRO) flew over every 12 days, day and night.",
@@ -294,7 +488,9 @@ const EN = {
   h_data: "Data used and available",
   p_data: "All from NASA's catalogue (Earthdata, ASF). Counted on 14 November 2026: re-run 01_search.py for the live figure.",
   credits: "NASA Space Apps Challenge 2026 project, “Dancing with the SARs” challenge. Open source. Radar: NASA/JPL–ISRO NISAR via ASF DAAC. Basemap: Esri.",
-  sources_h: "Sources for official figures:"
+  sources_h: "Sources for official figures:",
+  skip: "Skip intro", replay: "Replay the launch", sound: "Sound", title_sub: "The pulse of forests, seen from space",
+  orbit_note: "NISAR 747 km up, reconstructed view. It passes over every forest every 12 days."
 };
 const FR = {};
 document.querySelectorAll("[data-i18n]").forEach(el => { FR[el.dataset.i18n] = el.textContent; });
@@ -333,7 +529,10 @@ const nf = (v, d = 0) => v == null || !isFinite(v) ? "–" : v.toLocaleString(lo
 const shortName = z => z.name.split("–")[0].trim();
 
 // ---------------------------------------------------------------- map
-const map = L.map("map", { zoomSnap: 0.25, preferCanvas: true });
+const map = L.map("map", { zoomSnap: 0.25, preferCanvas: true, scrollWheelZoom: false });
+// the wheel scrolls the page; it zooms the map only after a click inside it
+map.on("click", () => map.scrollWheelZoom.enable());
+map.getContainer().addEventListener("mouseleave", () => map.scrollWheelZoom.disable());
 const base = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
   { maxZoom: 17, attribution: "Imagery © Esri" }).addTo(map);
 let tOk = 0, tErr = 0;
@@ -503,7 +702,7 @@ function drawSpark(vals, label, color, fireIdx) {
   pts.forEach(p => { if (!p) { on = false; return; } on ? sctx.lineTo(...p) : sctx.moveTo(...p); on = true; });
   sctx.strokeStyle = color; sctx.lineWidth = 3; sctx.stroke();
   pts.forEach((p, i) => { if (!p) return; sctx.beginPath(); sctx.arc(p[0], p[1], i === state.idx[state.zone] ? 6 : 3.5, 0, 7); sctx.fillStyle = color; sctx.fill(); });
-  sctx.fillStyle = "#ece8e1"; sctx.font = "600 22px IBM Plex Sans, sans-serif"; sctx.fillText(label, 12, 26);
+  sctx.fillStyle = "#eeebf8"; sctx.font = "600 22px Archivo, sans-serif"; sctx.fillText(label, 12, 26);
 }
 function bytes(c) { if (!c._b) { const s = atob(c.b64); c._b = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) c._b[i] = s.charCodeAt(i); } return c._b; }
 function seriesAt(z, ll) {
@@ -519,10 +718,10 @@ let marker = null;
 map.on("click", ev => {
   const S = t();
   const k = ORDER.find(q => seriesAt(D.zones[q], ev.latlng));
-  if (!k) { drawSpark([], S.outside, "#9aa0ad"); return; }
+  if (!k) { drawSpark([], S.outside, "#a9a5c8"); return; }
   if (k !== state.zone) setZone(k, false);
   const z = D.zones[k], ser = seriesAt(z, ev.latlng);
-  if (!ser.some(v => v != null)) { drawSpark([], S.no_data, "#9aa0ad"); return; }
+  if (!ser.some(v => v != null)) { drawSpark([], S.no_data, "#a9a5c8"); return; }
   const norm = ser.map(v => v == null ? null : Math.max(0, Math.min(1, (v + 10) / 14)));
   const fi = firstAfter(z);
   const pre = ser.slice(0, fi).filter(v => v != null), post = ser.slice(fi).filter(v => v != null);
@@ -544,14 +743,14 @@ document.getElementById("listen-site").addEventListener("click", () => {
 document.getElementById("listen-stop").addEventListener("click", stopSound);
 
 // ---------------------------------------------------------------- charts
-Chart.defaults.color = "#9aa0ad"; Chart.defaults.font.family = "IBM Plex Sans, sans-serif"; Chart.defaults.borderColor = "rgba(154,160,173,.14)";
+Chart.defaults.animation = false; Chart.defaults.color = "#a9a5c8"; Chart.defaults.font.family = "Archivo, sans-serif"; Chart.defaults.borderColor = "rgba(168,156,255,.12)";
 let chPulse = null;
 const fireBand = {
   id: "fireBand",
   beforeDatasetsDraw(c, args, o) {
     const { ctx, chartArea: a, scales: { x } } = c, x0 = x.getPixelForValue(o.from), x1 = x.getPixelForValue(o.to);
     ctx.save(); ctx.fillStyle = "rgba(249,115,22,.16)"; ctx.fillRect(x0, a.top, Math.max(3, x1 - x0), a.bottom - a.top);
-    ctx.fillStyle = "#fdba74"; ctx.font = "600 12px IBM Plex Sans"; ctx.fillText(o.label, Math.min(x0 + 4, a.right - 80), a.top + 14); ctx.restore();
+    ctx.fillStyle = "#fdba74"; ctx.font = "600 12px Archivo"; ctx.fillText(o.label, Math.min(x0 + 4, a.right - 80), a.top + 14); ctx.restore();
   }
 };
 const trackColors = ["#f97316", "#38bdf8", "#e879f9", "#a3e635"];
@@ -616,7 +815,7 @@ function renderCompare() {
   document.getElementById("area-bars").innerHTML = ORDER.map(k => {
     const z = D.zones[k], pct = z.burn.area_ha / z.official_ha * 100;
     const cut = z.burn.touches_edge ? ` <small title="${S.edge}">↗</small>` : "";
-    return `<div class="bar"><span>${shortName(z)}${cut}</span><div class="track"><i style="width:${Math.min(100, pct)}%;background:var(--ember)"></i></div><span class="v">${nf(pct)} %</span></div>`;
+    return `<div class="bar"><span>${shortName(z)}${cut}</span><div class="track"><i style="width:${Math.min(100, pct)}%;background:var(--pulse)"></i></div><span class="v">${nf(pct)} %</span></div>`;
   }).join("");
   document.getElementById("sev-bars").innerHTML = ORDER.map(k => {
     const z = D.zones[k], b = z.burn.by_severity_ha, tot = Math.max(1, b.low + b.moderate + b.high);
@@ -647,7 +846,7 @@ function applyLang(l) {
   document.querySelectorAll("[data-i18n]").forEach(el => { if (dict[el.dataset.i18n]) el.textContent = dict[el.dataset.i18n]; });
   renderSites(); renderInventory(); renderCompare(); renderZonePanels(); renderFooter();
   renderToggles(); renderLegend(); buildPulse(); setIndex(state.idx[state.zone]);
-  drawSpark([], t().click, "#9aa0ad");
+  drawSpark([], t().click, "#a9a5c8");
 }
 document.getElementById("lang-fr").addEventListener("click", () => applyLang("fr"));
 document.getElementById("lang-en").addEventListener("click", () => applyLang("en"));
@@ -658,6 +857,81 @@ map.fitBounds(D.zones[state.zone].focus || D.zones[state.zone].bounds, { padding
 syncLayers();
 applyLang(lang);
 })();
+</script>
+<script type="module">
+import { createIntro } from "./intro/intro.js?v=8";
+const body = document.body, mode = document.documentElement.dataset.launch;
+const cap = document.getElementById("launch-cap"), canvas = document.getElementById("space");
+let intro = null;
+function reveal() {
+  if (!body.classList.contains("launching")) return;
+  body.classList.remove("launching");
+  try { localStorage.setItem("nabd-launch-seen", "1"); } catch (e) {}
+  setTimeout(() => window.dispatchEvent(new Event("resize")), 60);
+}
+const lang = () => document.documentElement.lang === "en" ? "en" : "fr";
+function title() { body.classList.remove("titling"); void body.offsetWidth; body.classList.add("titling"); }
+
+// launch rumble, synthesised (no audio file): brown noise + crackle, follows the engines
+let audio = null;
+function startSound() {
+  const ctx = new (window.AudioContext || window.webkitAudioContext)(), len = ctx.sampleRate * 3, buf = ctx.createBuffer(2, len, ctx.sampleRate);
+  for (let ch = 0; ch < 2; ch++) { const d = buf.getChannelData(ch); let b = 0;
+    for (let i = 0; i < len; i++) { b = (b + 0.02 * (Math.random() * 2 - 1)) / 1.02; d[i] = b * 3.2 + (Math.random() < 0.0009 ? (Math.random() - 0.5) * 1.6 : 0); } }
+  const src = ctx.createBufferSource(); src.buffer = buf; src.loop = true;
+  const lp = ctx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 420;
+  const gain = ctx.createGain(); gain.gain.value = 0;
+  src.connect(lp).connect(gain).connect(ctx.destination); src.start();
+  const tick = () => { if (!audio) return; const L = intro ? intro.level() : 0;
+    gain.gain.setTargetAtTime(L * 0.9, ctx.currentTime, 0.08); lp.frequency.setTargetAtTime(160 + L * 900, ctx.currentTime, 0.1); requestAnimationFrame(tick); };
+  audio = { ctx, stop() { src.stop(); ctx.close(); } }; tick();
+}
+try {
+  intro = await createIntro({
+    canvas, lang: lang(), quality: Math.min(innerWidth, innerHeight) < 600 ? 0 : 1,
+    onCaption: c => { cap.style.opacity = 0; setTimeout(() => { cap.textContent = c; cap.style.opacity = 1; }, c ? 180 : 0); },
+    onReveal: reveal,
+    onSlow: () => body.classList.add("lite"),
+  });
+  window.__launchOK = true;
+  if (mode === "still") intro.still();
+  else { intro.start(); if (mode === "orbit") intro.skip(); else title(); }
+} catch (e) {
+  console.warn("3D intro unavailable:", e); canvas.remove(); reveal();
+}
+document.getElementById("launch-skip").addEventListener("click", () => { intro && intro.skip(); reveal(); body.classList.remove("titling"); });
+document.getElementById("launch-sound").addEventListener("click", e => {
+  const on = e.currentTarget.getAttribute("aria-pressed") !== "true"; e.currentTarget.setAttribute("aria-pressed", on);
+  if (on && !audio) startSound(); else if (!on && audio) { audio.stop(); audio = null; }
+});
+addEventListener("keydown", e => { if (e.key === "Escape" && body.classList.contains("launching")) { intro && intro.skip(); reveal(); } });
+document.getElementById("launch-replay").addEventListener("click", () => {
+  if (!intro || mode === "still") return;
+  scrollTo({ top: 0 }); body.classList.add("launching"); intro.setLang(lang()); intro.start(); title();
+});
+for (const id of ["lang-fr", "lang-en"]) document.getElementById(id).addEventListener("click", () => intro && intro.setLang(lang()));
+// the orbit behind the page answers scroll and the mouse: the camera travels around NISAR as you read
+if (intro && mode !== "still") {
+  const onScroll = () => intro.setScroll(scrollY / Math.max(1, document.documentElement.scrollHeight - innerHeight));
+  addEventListener("scroll", onScroll, { passive: true }); onScroll();
+  addEventListener("pointermove", e => intro.setPointer(e.clientX / innerWidth * 2 - 1, e.clientY / innerHeight * 2 - 1), { passive: true });
+}
+// navbar: highlight the section being read
+{
+  const links = [...document.querySelectorAll(".links a")], byId = new Map(links.map(a => [a.getAttribute("href").slice(1), a]));
+  const seen = new Map();
+  const io = new IntersectionObserver(es => {
+    for (const e of es) seen.set(e.target.id, e.isIntersecting ? e.intersectionRatio : 0);
+    let best = null, top = 0; for (const [id, r] of seen) if (r > top) { top = r; best = id; }
+    links.forEach(a => a.removeAttribute("aria-current")); if (best && byId.get(best)) byId.get(best).setAttribute("aria-current", "true");
+  }, { rootMargin: "-30% 0px -55% 0px", threshold: [0, 0.01, 0.2, 0.5, 1] });
+  for (const id of byId.keys()) { const el = document.getElementById(id); if (el) io.observe(el); }
+}
+// the glass catches light where the pointer is
+addEventListener("pointermove", e => {
+  const el = e.target.closest && e.target.closest(".card, .site"); if (!el) return;
+  const r = el.getBoundingClientRect(); el.style.setProperty("--mx", (e.clientX - r.left) + "px"); el.style.setProperty("--my", (e.clientY - r.top) + "px");
+}, { passive: true });
 </script>
 </body>
 </html>
