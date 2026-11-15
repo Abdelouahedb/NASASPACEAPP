@@ -1,21 +1,76 @@
-# NABD نبض — L'été de feu 2026
+# NABD نبض : l'été de feu 2026
 
-NASA Space Apps Challenge 2026 · défi **Dancing with the SARs**
+**Le pouls des forêts, vu depuis l'espace.** NASA Space Apps Challenge 2026, défi **Dancing with the SARs**.
 
-En juillet 2026, deux incendies records ont brûlé près de 1 000 km² de forêt en Espagne et en France, et le Moyen Atlas marocain a brûlé lui aussi. NABD utilise le radar **NISAR** (NASA–ISRO, bande L, 24 cm) pour mesurer, à travers la fumée et la nuit :
+*English summary at the end.*
 
-- **où** le feu est passé : la cicatrice, pixel par pixel ;
-- **avec quelle violence** : la sévérité, d'après la chute du signal HV en dB ;
-- **quand** : la progression, passage par passage ;
-- **et si la forêt repart** : le « pouls » de la cicatrice comparée à la forêt intacte.
+En juillet 2026, deux incendies records ont brûlé près de 1 000 km² de forêt en Espagne et en France, et le Moyen Atlas marocain a brûlé lui aussi. NABD utilise le radar **NISAR** (NASA–ISRO) pour montrer, à travers la fumée, les nuages et la nuit, où le feu est passé, avec quelle violence, et si la forêt repart.
 
-Le tout est vérifié contre les bilans officiels, et on peut **écouter** chaque point de la carte.
+---
 
-| Site | Feu | Bilan officiel | Images NISAR GCOV (14/11/2026) |
-|---|---|---|---|
-| **Ávila – Burgohondo** (Espagne) | 22 juil. → 6 août 2026 | ≈ 50 000 ha (77 000 avec Madrid et Tolède) | 42 + 3 validées, depuis le 3 janv. 2026 |
-| **Gironde – Saumos / Le Porge** (France) | 22 juil. → 2 août 2026 | 42 000 ha | 49 + 3 validées, depuis le 4 nov. 2025 |
-| **Laânoussar – Sefrou** (Maroc) | 31 juil. → 7 août 2026 | 480 ha | ≈ 85 + 9 validées, depuis le 20 juin 2026 |
+## Le problème
+
+- Pendant un grand feu, la **fumée et les nuages** cachent le sol aux satellites optiques (Landsat, Sentinel-2). Les meilleures images arrivent souvent trop tard.
+- Les **bilans officiels** donnent un seul chiffre : une surface. Ils ne disent ni **où** le feu a frappé le plus fort, ni **si la forêt repart** dans les mois qui suivent.
+- Les données radar sont gratuites, mais lourdes (environ 6 Go par image) et difficiles à lire pour un service forestier ou une commune.
+
+## La solution
+
+NABD, c'est une chaîne ouverte en **six scripts Python** et un **site web** qu'on ouvre dans n'importe quel navigateur.
+
+1. **Chercher** les passages NISAR au-dessus de chaque feu (catalogue NASA Earthdata / ASF).
+2. **Télécharger seulement la fenêtre du feu** : quelques Mo au lieu de 6 Go par image (service Harmony de la NASA).
+3. **Mesurer la chute du signal radar** HV : quand une forêt brûle, le radar bande L (24 cm), qui « touche » les branches et les troncs, perd du signal.
+4. **Dessiner la cicatrice**, sa **sévérité** et sa **progression**, puis suivre le **pouls** de la forêt, passage par passage.
+5. **Vérifier** le résultat avec les bilans officiels et avec un deuxième produit NASA indépendant, vu par l'optique (OPERA DIST-ALERT).
+6. **Raconter** le tout sur le site : on rejoue chaque passage, on clique un point de la carte et on lit son histoire.
+
+## Résultats (vraies images NISAR 2026)
+
+| Site | Feu | Bilan officiel | Mesuré par NISAR | Part du bilan |
+|---|---|---|---|---|
+| **Gironde, Saumos / Le Porge** (France) | 22 juil. → 2 août 2026 | 42 000 ha | 38 643 ha | **92 %** |
+| **Laânoussar, Sefrou** (Maroc) | 31 juil. → 7 août 2026 | 480 ha | 473 ha | **99 %** |
+| **Ávila, Burgohondo** (Espagne) | 22 juil. → 6 août 2026 | ≈ 50 000 ha | 30 995 ha | **62 %** |
+
+Ávila est plus bas pour deux raisons connues : le feu sort du cadre analysé par l'est, et une grande partie a brûlé des broussailles et des prairies, que la bande L voit peu (voir *Limites*).
+
+## Les données de la NASA
+
+| Données | Ce qu'on en fait | Où |
+|---|---|---|
+| **NISAR L2 GCOV** (bande L, HH et HV, corrigé du relief) | cicatrice, sévérité, progression, pouls | ASF DAAC, via `earthaccess` et Harmony |
+| **OPERA DIST-ALERT-HLS** (NASA/JPL, Landsat + Sentinel-2) | vérification optique indépendante | LP DAAC, via `earthaccess` |
+| **Blue Marble** (NASA Earth Observatory) | la Terre du globe 3D de l'intro | NASA Visible Earth |
+
+Toutes ces données sont gratuites et ouvertes. Un compte NASA Earthdata (gratuit) suffit.
+
+## Pour qui
+
+- **Services forestiers et protection civile** : la cicatrice et sa sévérité sans attendre un ciel dégagé, pour prioriser les secteurs à sécuriser et à reboiser.
+- **Communes et associations de reboisement** : savoir où replanter, et suivre la repousse tous les 12 jours.
+- **Chercheurs, élèves, citoyens** : une méthode documentée, du code et des données ouverts.
+
+---
+
+## Le site
+
+Ouvrez `web/index.html` via un petit serveur (voir *Lancer*). Le site est en **français et en anglais**.
+
+| Partie | Ce qu'on y voit |
+|---|---|
+| **Intro 3D** | Le vrai lancement de NISAR : GSLV-F16, 30 juillet 2025, Sriharikota. Gros plan sur les moteurs à l'allumage, décollage, séparation des étages, ouverture de la coiffe, déploiement du bras de 9 m et de l'antenne de 12 m. Elle ne se joue qu'à la première visite et peut être passée. |
+| **Mission** | Le problème, les données NASA, la solution, pour qui. |
+| **Carte** | Chaque passage NISAR rejouable, couches radar / sévérité / chute du signal / progression / optique OPERA, glissière avant-après. |
+| **Inspecter un point** | Un clic sur la carte : verdict en clair (« le feu est passé ici vers le… »), valeurs avant, au plus bas, aujourd'hui, petite courbe, et version sonore. |
+| **Pouls** | La courbe de la cicatrice par rapport à la forêt intacte, avec trois chiffres clés : chute maximale, dernier passage, repousse depuis le creux. |
+| **Chiffres** | Radar contre bilans officiels, sévérité, et accord avec l'optique OPERA. |
+| **Satellite (3D)** | NISAR et sa fusée GSLV-F16 à faire tourner (la 3D démarre seulement sur demande). Le modèle détaillé de NISAR sur Sketchfab se charge seulement si on clique. |
+| **Données** | Toutes les images disponibles, avec leurs dates. |
+
+**Rapide et accessible** : l'intro passe en version légère sur les cartes graphiques modestes ; le fond 3D s'arrête pendant la lecture ; les images radar et l'historique par point ne se chargent que quand on en a besoin ; la vue 3D du satellite démarre seulement sur demande ; boutons de 44 px minimum, navigation au clavier, textes lisibles sur le fond, respect du réglage « réduire les animations ».
+
+---
 
 ## Installation (une fois)
 
@@ -32,23 +87,45 @@ Compte NASA gratuit : <https://urs.earthdata.nasa.gov/users/new>. Créez ensuite
 machine urs.earthdata.nasa.gov login VOTRE_NOM password VOTRE_MOT_DE_PASSE
 ```
 
-Ne publiez jamais ce fichier : il est déjà exclu par `.gitignore`.
+**Ne publiez jamais ce fichier** : il est déjà exclu par `.gitignore`.
 
 ## Lancer
 
 ```bash
-python scripts/01_search.py --zone all          # liste à jour des images (sans connexion)
+python scripts/01_search.py --zone all          # liste à jour des images NISAR
 python scripts/02_download.py --zone sefrou --limit 2    # petit test d'abord
 python scripts/02_download.py --zone all        # tout (seulement la fenêtre de chaque feu)
 #   en cas d'échec de Harmony : ajouter --method stream
 python scripts/03_fire.py --zone all            # cicatrice, sévérité, progression, pouls
-python scripts/04_export.py                     # web/data/data.js
+python scripts/05_dist.py --zone all            # vérification optique NASA OPERA (facultatif)
+python scripts/04_export.py                     # écrit web/data/data.js
 python -m http.server 8000 -d web               # puis http://localhost:8000
 ```
 
 Avant d'utiliser les vraies données : supprimez les dossiers `data/raw/<zone>/DEMO_*`.
 Sans données, `python scripts/00_make_demo.py` crée des images **synthétiques** aux vraies dates NISAR,
-pour tester la chaîne. L'app affiche alors un bandeau « démonstration ».
+pour tester la chaîne. Le site affiche alors un bandeau « démonstration ».
+
+## Organisation du dépôt
+
+```
+scripts/
+  config.py        réglages : zones, dates des feux, seuils
+  common.py        outils partagés (lecture GCOV, mosaïque, filtre de Lee)
+  00_make_demo.py  données synthétiques pour tester sans compte NASA
+  01_search.py     recherche des passages NISAR (ASF)
+  02_download.py   téléchargement des seules fenêtres utiles (Harmony)
+  03_fire.py       cicatrice, sévérité, progression, pouls (GeoTIFF + JSON)
+  05_dist.py       comparaison avec NASA OPERA DIST-ALERT (Landsat + Sentinel-2)
+  04_export.py     regroupe tout dans web/data/data.js
+web/
+  index.html       le site (carte Leaflet, graphiques Chart.js)
+  data/            data.js, l'historique radar par feu (cube_*.bin) et les images des passages
+  intro/           l'intro 3D (three.js) et les textures de la Terre
+  hangar/          la vue 3D de NISAR et de la GSLV
+  vendor/          three.js et la police Archivo, copiés dans le dépôt
+data/              images brutes et résultats (non publiés, voir .gitignore)
+```
 
 ## Méthode (03_fire.py)
 
@@ -61,6 +138,16 @@ pour tester la chaîne. L'app affiche alors un bandeau « démonstration ».
 
 Les réglages sont dans `scripts/config.py`. Les résultats en GeoTIFF (`dHV_dB.tif`, `severity.tif`) sont dans `data/work/<zone>/` et s'ouvrent dans QGIS.
 
+## Vérification optique (05_dist.py)
+
+`05_dist.py` cherche les tuiles **OPERA DIST-ALERT** publiées après chaque feu, ne télécharge que deux couches (statut et date de la perte de végétation), les remet sur la grille du radar et calcule :
+
+- la **part de la cicatrice radar confirmée par l'optique** ;
+- la surface de végétation perdue vue par l'optique autour de la cicatrice ;
+- une couche pour la carte : en cyan, radar et optique d'accord ; en magenta, ce que seule l'optique voit.
+
+Les deux mesures sont indépendantes (micro-ondes contre lumière visible et infrarouge). Quand elles s'accordent, le résultat est solide ; là où l'optique a des nuages, le radar continue de voir.
+
 ## Mise en ligne
 
 Poussez le dossier sur GitHub, puis dans **Settings → Pages**, choisissez la branche `main` et le dossier `/ (root)`. Le fichier `index.html` à la racine redirige vers `web/`.
@@ -70,5 +157,31 @@ Poussez le dossier sur GitHub, puis dans **Settings → Pages**, choisissez la b
 - Les produits NISAR sont **provisoires** (calibration en cours) ; la version validée ne couvre que depuis le 21/10/2026.
 - Il manque des passages entre le 27/07 et le 10/08/2026 (lacune de l'instrument). C'est pour ça qu'on regarde plusieurs orbites.
 - En pente forte (Moyen Atlas, Gredos), l'ombre et le repliement radar peuvent gêner. Les zones en pente sont à interpréter avec prudence.
-- Le seuil de −1 dB est un choix, réglé sur les vraies images 2026 : Gironde 92 % du bilan officiel, Laânoussar 109 %.
-- Ávila : le feu sort du cadre analysé par l'est (vers Madrid), et une grande partie a brûlé des broussailles et des prairies, que la bande L voit peu. Le radar en compte environ 60 %. Pour agrandir le cadre : changer `bbox` dans `config.py`, puis `01_search.py --zone avila` et `02_download.py --zone avila --fresh`.
+- Le seuil de −1 dB est un choix, réglé sur les vraies images 2026 : Gironde 92 % du bilan officiel, Laânoussar 99 %.
+- Ávila : le feu sort du cadre analysé par l'est (vers Madrid), et une grande partie a brûlé des broussailles et des prairies, que la bande L voit peu. Pour agrandir le cadre : changer `bbox` dans `config.py`, puis `01_search.py --zone avila` et `02_download.py --zone avila --fresh`.
+- Les codes de « végétation perdue » d'OPERA utilisés par `05_dist.py` sont à confirmer sur les vraies tuiles (le script affiche la liste des valeurs trouvées).
+
+## Crédits et licences
+
+- **Radar** : NASA/JPL–ISRO, mission NISAR, données distribuées par l'ASF DAAC.
+- **OPERA DIST-ALERT** : NASA/JPL, projet OPERA, distribué par le LP DAAC.
+- **Terre** : textures dérivées des images NASA *Blue Marble* (NASA Earth Observatory).
+- **Fond de carte** : Esri World Imagery.
+- **Bibliothèques** : [three.js](https://threejs.org) (MIT), [Leaflet](https://leafletjs.com) (BSD-2), [Chart.js](https://www.chartjs.org) (MIT), [earthaccess](https://github.com/nsidc/earthaccess) (MIT). Police [Archivo](https://github.com/Omnibus-Type/Archivo) (SIL Open Font License, voir `web/vendor/fonts/`).
+- **Modèles 3D** :
+  - Modèle détaillé de NISAR : « [NISAR Satellite ISRO - NASA Joint Mission](https://sketchfab.com/3d-models/nisar-satellite-isro-nasa-joint-mission-0103309668d243dbbfab3c8fc6b9683c) » par MechLab3D, **affiché depuis Sketchfab** (lecteur intégré), il n'est pas copié dans ce dépôt.
+  - NISAR et la fusée GSLV de l'intro sont des modèles faits à la main pour NABD, d'après la configuration publiée par l'ISRO.
+- **Chiffres officiels des feux** : voir la liste des sources en bas du site.
+
+---
+
+## English summary
+
+**NABD (Arabic for "pulse")** measures the 2026 summer wildfires at Ávila (Spain), Gironde (France) and Laânoussar–Sefrou (Morocco) with **NASA–ISRO NISAR** L-band radar, which sees through smoke, cloud and night.
+
+- **Problem**: during big fires, optical satellites are blind under smoke, and official reports give only one number (an area), not where the fire was most severe or whether the forest recovers.
+- **Solution**: an open Python pipeline that downloads only each fire's window of NISAR GCOV data, maps the burn scar, severity, spread and the "pulse" (recovery) of the forest from the drop of the HV signal, cross-checks it with official figures and with NASA OPERA DIST-ALERT (Landsat + Sentinel-2), and a bilingual website to explore it.
+- **Results on real 2026 NISAR data**: Gironde 92% of the official burned area, Laânoussar 99%, Ávila 62% (part of the fire lies outside the analysed frame and burned scrub and grassland, which L-band sees poorly).
+- **Website**: 3D intro of the real NISAR launch (GSLV-F16, 30 July 2025), interactive map with per-pass replay, point inspector, recovery indicators, optical cross-check, and a 3D view of NISAR and its rocket.
+
+Run: see *Installation* and *Lancer* above (same commands).
