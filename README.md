@@ -223,3 +223,5 @@ Navigate to **`http://localhost:8000`** in your browser.
 ## 📜 Credits & License
 Developed for the **NASA Space Apps Challenge 2026** under track *Dancing with the SARs*.  
 NISAR data products provided by **NASA / ISRO** through the **Alaska Satellite Facility (ASF) DAAC**.
+
+<!-- collaboration badge -->
