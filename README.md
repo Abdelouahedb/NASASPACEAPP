@@ -27,13 +27,15 @@ NABD, c'est une chaîne ouverte en **six scripts Python** et un **site web** qu'
 
 ## Résultats (vraies images NISAR 2026)
 
-| Site | Feu | Bilan officiel | Mesuré par NISAR | Part du bilan |
-|---|---|---|---|---|
-| **Gironde, Saumos / Le Porge** (France) | 22 juil. → 2 août 2026 | 42 000 ha | 38 643 ha | **92 %** |
-| **Laânoussar, Sefrou** (Maroc) | 31 juil. → 7 août 2026 | 480 ha | 473 ha | **99 %** |
-| **Ávila, Burgohondo** (Espagne) | 22 juil. → 6 août 2026 | ≈ 50 000 ha | 30 995 ha | **62 %** |
+| Site | Feu | Bilan officiel | Mesuré par NISAR | Part du bilan | Confirmé par l'optique (OPERA) |
+|---|---|---|---|---|---|
+| **Gironde, Saumos / Le Porge** (France) | 22 juil. → 2 août 2026 | 42 000 ha | 38 643 ha | **92 %** | **82 %** |
+| **Laânoussar, Sefrou** (Maroc) | 31 juil. → 7 août 2026 | 480 ha | 473 ha | **99 %** | **78 %** |
+| **Ávila, Burgohondo** (Espagne) | 22 juil. → 6 août 2026 | ≈ 50 000 ha | 30 995 ha | **62 %** | **83 %** |
 
-Ávila est plus bas pour deux raisons connues : le feu sort du cadre analysé par l'est, et une grande partie a brûlé des broussailles et des prairies, que la bande L voit peu (voir *Limites*).
+*Confirmé par l'optique* : part de la cicatrice radar où le produit NASA OPERA DIST-ALERT (Landsat 8/9 et Sentinel-2, images d'octobre 2026) voit aussi une perte de végétation. Les deux mesures sont indépendantes (micro-ondes contre lumière visible et infrarouge) : environ 4 pixels brûlés sur 5 vus par le radar sont confirmés.
+
+Ávila est plus bas face au bilan officiel pour deux raisons connues : le feu sort du cadre analysé par l'est, et une grande partie a brûlé des broussailles et des prairies, que la bande L voit peu. L'optique le confirme : dans le cadre analysé, elle compte 36 838 ha de végétation perdue, contre 26 514 ha pour le radar.
 
 ## Les données de la NASA
 
@@ -148,9 +150,21 @@ Les réglages sont dans `scripts/config.py`. Les résultats en GeoTIFF (`dHV_dB.
 
 Les deux mesures sont indépendantes (micro-ondes contre lumière visible et infrarouge). Quand elles s'accordent, le résultat est solide ; là où l'optique a des nuages, le radar continue de voir.
 
-## Mise en ligne
+## Ouvrir le site sur un autre PC
 
-Poussez le dossier sur GitHub, puis dans **Settings → Pages**, choisissez la branche `main` et le dossier `/ (root)`. Le fichier `index.html` à la racine redirige vers `web/`.
+Il faut seulement Python (pas de compte NASA : les résultats sont déjà dans `web/data/`).
+
+```bash
+git clone <adresse du dépôt>
+cd <dossier du dépôt>
+python -m http.server 8000 -d web      # puis ouvrir http://localhost:8000
+```
+
+Ne pas double-cliquer sur `index.html` : ouvert comme un simple fichier, le navigateur bloque l'intro 3D et les données. Une connexion Internet est nécessaire pour le fond de carte et les graphiques.
+
+## Mise en ligne (GitHub Pages)
+
+Dans le dépôt sur GitHub : **Settings → Pages** → *Deploy from a branch* → choisir la branche du projet et le dossier `/ (root)`. Le fichier `index.html` à la racine redirige vers `web/`. Avec un compte gratuit, le dépôt doit être public.
 
 ## Limites (à dire au jury)
 
@@ -159,7 +173,7 @@ Poussez le dossier sur GitHub, puis dans **Settings → Pages**, choisissez la b
 - En pente forte (Moyen Atlas, Gredos), l'ombre et le repliement radar peuvent gêner. Les zones en pente sont à interpréter avec prudence.
 - Le seuil de −1 dB est un choix, réglé sur les vraies images 2026 : Gironde 92 % du bilan officiel, Laânoussar 99 %.
 - Ávila : le feu sort du cadre analysé par l'est (vers Madrid), et une grande partie a brûlé des broussailles et des prairies, que la bande L voit peu. Pour agrandir le cadre : changer `bbox` dans `config.py`, puis `01_search.py --zone avila` et `02_download.py --zone avila --fresh`.
-- Les codes de « végétation perdue » d'OPERA utilisés par `05_dist.py` sont à confirmer sur les vraies tuiles (le script affiche la liste des valeurs trouvées).
+- Pour OPERA, `05_dist.py` compte comme « végétation perdue » les codes de statut 2, 3, 5, 6, 7 et 8. Sur les vraies tuiles d'octobre 2026, ils donnent 78 à 83 % d'accord avec le radar, ce qui est cohérent ; ce choix reste à revérifier avec la documentation officielle du produit.
 
 ## Crédits et licences
 
@@ -181,7 +195,7 @@ Poussez le dossier sur GitHub, puis dans **Settings → Pages**, choisissez la b
 
 - **Problem**: during big fires, optical satellites are blind under smoke, and official reports give only one number (an area), not where the fire was most severe or whether the forest recovers.
 - **Solution**: an open Python pipeline that downloads only each fire's window of NISAR GCOV data, maps the burn scar, severity, spread and the "pulse" (recovery) of the forest from the drop of the HV signal, cross-checks it with official figures and with NASA OPERA DIST-ALERT (Landsat + Sentinel-2), and a bilingual website to explore it.
-- **Results on real 2026 NISAR data**: Gironde 92% of the official burned area, Laânoussar 99%, Ávila 62% (part of the fire lies outside the analysed frame and burned scrub and grassland, which L-band sees poorly).
+- **Results on real 2026 NISAR data**: Gironde 92% of the official burned area, Laânoussar 99%, Ávila 62% (part of the fire lies outside the analysed frame and burned scrub and grassland, which L-band sees poorly). An independent check with NASA OPERA DIST-ALERT (Landsat + Sentinel-2) confirms 82%, 78% and 83% of the radar burn scars.
 - **Website**: 3D intro of the real NISAR launch (GSLV-F16, 30 July 2025), interactive map with per-pass replay, point inspector, recovery indicators, optical cross-check, and a 3D view of NISAR and its rocket.
 
-Run: see *Installation* and *Lancer* above (same commands).
+Run: see *Installation* and *Lancer* above (same commands). To just view the site: `python -m http.server 8000 -d web`, then open http://localhost:8000.
