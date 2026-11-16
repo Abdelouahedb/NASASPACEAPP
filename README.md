@@ -1,5 +1,7 @@
 # NABD (نبض) — L'été de feu 2026 / Wildfire Monitoring with NISAR
 
+**Live wildfire dashboard:** [nabd.earth](https://nabd.earth/)
+
 > **NASA Space Apps Challenge 2026 · Challenge: *Dancing with the SARs***  
 > Rapid Wildfire Scar Mapping, Severity Assessment, and Post-Fire Forest Recovery Tracking using **NASA-ISRO SAR (NISAR)** L-band Radar.
 
